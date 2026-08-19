@@ -1,47 +1,30 @@
+const KV_URL   = process.env.KV_REST_API_URL;
+const KV_TOKEN = process.env.KV_REST_API_TOKEN;
+
+async function redis(...command) {
+  const res = await fetch(KV_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${KV_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(command),
+  });
+  const json = await res.json();
+  if (json.error) throw new Error(json.error);
+  return json.result;
+}
+
 export default async function handler(req, res) {
-  const out = {
-    hasKvUrl: !!process.env.KV_REST_API_URL,
-    hasKvToken: !!process.env.KV_REST_API_TOKEN,
-    kvUrlPrefix: (process.env.KV_REST_API_URL || '').slice(0, 30),
-    hasCmsPassword: !!process.env.CMS_PASSWORD,
-    hasCmsToken: !!process.env.CMS_SECRET_TOKEN,
-    node: process.version,
-  };
-
+  const out = {};
   try {
-    const r = await fetch(`${process.env.KV_REST_API_URL}/set/diag_test/hello`, {
-      headers: { Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}` },
-    });
-    out.writeStatus = r.status;
-    out.writeBody = await r.text();
+    out.hset = await redis('HSET', 'wh_content', 'diag_field', 'diag_wert_123');
+    const flat = await redis('HGETALL', 'wh_content');
+    const obj = {};
+    for (let i = 0; i < flat.length; i += 2) obj[flat[i]] = flat[i + 1];
+    out.hgetall = obj;
+    out.roundtripOk = obj.diag_field === 'diag_wert_123';
+    await redis('HDEL', 'wh_content', 'diag_field');
+    out.cleanedUp = true;
   } catch (e) {
-    out.writeError = e.message;
+    out.error = e.message;
   }
-
-  try {
-    const r = await fetch(`${process.env.KV_REST_API_URL}/hset/wh_content`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(['diag_field', 'diag_value']),
-    });
-    out.hsetStatus = r.status;
-    out.hsetBody = await r.text();
-  } catch (e) {
-    out.hsetError = e.message;
-  }
-
-  try {
-    const r = await fetch(`${process.env.KV_REST_API_URL}/hgetall/wh_content`, {
-      headers: { Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}` },
-    });
-    out.hgetallStatus = r.status;
-    out.hgetallBody = await r.text();
-  } catch (e) {
-    out.hgetallError = e.message;
-  }
-
   res.json(out);
 }
