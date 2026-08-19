@@ -2,13 +2,22 @@
 const KV_URL   = process.env.KV_REST_API_URL;
 const KV_TOKEN = process.env.KV_REST_API_TOKEN;
 
+// Upstash REST: komplettes Kommando als Array an die Basis-URL
+async function redis(...command) {
+  const res = await fetch(KV_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${KV_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(command),
+  });
+  const json = await res.json();
+  if (json.error) throw new Error(json.error);
+  return json.result;
+}
+
 async function hgetall(key) {
   if (!KV_URL || !KV_TOKEN) return {};
-  const res = await fetch(`${KV_URL}/hgetall/${encodeURIComponent(key)}`, {
-    headers: { Authorization: `Bearer ${KV_TOKEN}` },
-  });
-  const { result } = await res.json();
-  if (!result || !Array.isArray(result)) return {};
+  const result = await redis('HGETALL', key);
+  if (!Array.isArray(result)) return {};
   const obj = {};
   for (let i = 0; i < result.length; i += 2) {
     obj[result[i]] = result[i + 1];
@@ -17,12 +26,7 @@ async function hgetall(key) {
 }
 
 async function hset(key, field, value) {
-  const res = await fetch(`${KV_URL}/hset/${encodeURIComponent(key)}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${KV_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([field, String(value ?? '')]),
-  });
-  return res.json();
+  return redis('HSET', key, field, String(value ?? ''));
 }
 
 function isAuthorized(req) {
