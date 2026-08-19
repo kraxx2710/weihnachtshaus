@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 150">
+  <g fill="#d7192d">
+    <path d="M174 8c22 0 44 8 60 23-12 16-33 27-60 27s-48-11-60-27c16-15 38-23 60-23z"/>
+    <path fill="#fff" d="M137 25h75v8h-75zm12 14h51v7h-51z"/>
+    <text x="20" y="104" font-family="Arial,Helvetica,sans-serif" font-size="48" font-weight="700">TRANSGOURMET</text>
+    <rect x="137" y="117" width="180" height="28" rx="5"/>
+    <text x="153" y="138" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="19" font-weight="700">cash &amp; carry</text>
+  </g>
+</svg>
