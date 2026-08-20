@@ -938,3 +938,15 @@ body.cms-active [data-cms] { min-height: 1em; }
   .project-card div { height: auto; }
   .project-card p { -webkit-line-clamp: 8; }
 }
+
+/* Wirkungs-Karten: feste Hoehe */
+.impact-grid article {
+  height: 245px;
+  min-height: 245px !important;
+  overflow: hidden;
+}
+.impact-grid p { -webkit-line-clamp: 4; }
+@media (max-width: 520px) {
+  .impact-grid article { height: 190px; min-height: 190px !important; }
+  .impact-grid p { -webkit-line-clamp: 3; }
+}
