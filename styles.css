@@ -914,3 +914,27 @@ footer .brand small{margin-top:5px;font-size:8px;letter-spacing:.18em;color:#afb
 
 /* Editierbare Felder im Admin-Modus: kein Layout-Sprung */
 body.cms-active [data-cms] { min-height: 1em; }
+
+/* Projektkarten: feste Hoehe, Textbereich klemmt sauber ab */
+.project-card {
+  height: 610px;
+  min-height: 610px !important;
+}
+.project-card div {
+  height: 300px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.project-card p {
+  -webkit-line-clamp: 5;
+  margin: 0;
+}
+.project-card h3 { margin: 9px 0 14px; }
+
+@media (max-width: 900px) {
+  .project-card { height: auto; min-height: 0 !important; }
+  .project-card div { height: auto; }
+  .project-card p { -webkit-line-clamp: 8; }
+}
