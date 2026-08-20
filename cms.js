@@ -150,6 +150,30 @@
         { id: 'story_p3',    label: 'Absatz 3',      typ: 'textarea' },
         { id: 'story_img',   label: 'Portraitfoto',  typ: 'image' },
         { id: 'story_quote', label: 'Zitat',         typ: 'textarea' },
+        { id: 'tl1_year', label: 'Zeitleiste 1 – Jahr/Label',  typ: 'text' },
+        { id: 'tl1_h3',   label: 'Zeitleiste 1 – Titel',        typ: 'text' },
+        { id: 'tl1_text', label: 'Zeitleiste 1 – Text',         typ: 'textarea' },
+        { id: 'tl2_year', label: 'Zeitleiste 2 – Jahr/Label',  typ: 'text' },
+        { id: 'tl2_h3',   label: 'Zeitleiste 2 – Titel',        typ: 'text' },
+        { id: 'tl2_text', label: 'Zeitleiste 2 – Text',         typ: 'textarea' },
+        { id: 'tl3_year', label: 'Zeitleiste 3 – Jahr/Label',  typ: 'text' },
+        { id: 'tl3_h3',   label: 'Zeitleiste 3 – Titel',        typ: 'text' },
+        { id: 'tl3_text', label: 'Zeitleiste 3 – Text',         typ: 'textarea' },
+        { id: 'tl4_year', label: 'Zeitleiste 4 – Jahr/Label',  typ: 'text' },
+        { id: 'tl4_h3',   label: 'Zeitleiste 4 – Titel',        typ: 'text' },
+        { id: 'tl4_text', label: 'Zeitleiste 4 – Text',         typ: 'textarea' },
+        { id: 'tl5_year', label: 'Zeitleiste 5 – Jahr/Label',  typ: 'text' },
+        { id: 'tl5_h3',   label: 'Zeitleiste 5 – Titel',        typ: 'text' },
+        { id: 'tl5_text', label: 'Zeitleiste 5 – Text',         typ: 'textarea' },
+        { id: 'tl6_year', label: 'Zeitleiste 6 – Jahr/Label',  typ: 'text' },
+        { id: 'tl6_h3',   label: 'Zeitleiste 6 – Titel',        typ: 'text' },
+        { id: 'tl6_text', label: 'Zeitleiste 6 – Text',         typ: 'textarea' },
+        { id: 'tl7_year', label: 'Zeitleiste 7 – Jahr/Label',  typ: 'text' },
+        { id: 'tl7_h3',   label: 'Zeitleiste 7 – Titel',        typ: 'text' },
+        { id: 'tl7_text', label: 'Zeitleiste 7 – Text',         typ: 'textarea' },
+        { id: 'tl8_year', label: 'Zeitleiste 8 – Jahr/Label',  typ: 'text' },
+        { id: 'tl8_h3',   label: 'Zeitleiste 8 – Titel',        typ: 'text' },
+        { id: 'tl8_text', label: 'Zeitleiste 8 – Text',         typ: 'textarea' },
       ]
     },
     {
@@ -268,7 +292,30 @@
     }
   }
 
+  // Zusätzliche Galerie-Bilder (dynamische Liste, kein fixes data-cms-Element)
+  let galleryExtraItems = [];
+
+  function renderGalleryExtra() {
+    const container = document.getElementById('gallery-extra');
+    if (!container) return;
+    container.innerHTML = '';
+    galleryExtraItems.forEach(url => {
+      const btn = document.createElement('button');
+      btn.className = 'gallery-item';
+      btn.type = 'button';
+      btn.dataset.full = url;
+      btn.innerHTML = `<img src="${url}" alt="Weiteres Foto vom Weihnachtshaus">`;
+      container.appendChild(btn);
+    });
+  }
+
   function applyToDOM(fieldId, value) {
+    if (fieldId === 'gallery_extra') {
+      try { galleryExtraItems = value ? JSON.parse(value) : []; }
+      catch { galleryExtraItems = []; }
+      renderGalleryExtra();
+      return;
+    }
     if (!value) return;
     const el = document.querySelector(`[data-cms="${fieldId}"]`);
     if (!el) return;
@@ -604,7 +651,88 @@
       body.appendChild(divider);
     });
 
+    // Galerie: dynamische Liste zusätzlicher Bilder + "+"-Button
+    if (sec.key === 'galerie') {
+      buildGalleryExtraEditor(body);
+    }
+
     panel.classList.add('open');
+  }
+
+  // ── Galerie: beliebig viele zusätzliche Bilder ────────
+  function buildGalleryExtraEditor(body) {
+    const wrap = document.createElement('div');
+    wrap.className = 'cms-field-group';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = 'Weitere Bilder (zusätzliche Reihen)';
+    wrap.appendChild(lbl);
+
+    const grid = document.createElement('div');
+    grid.className = 'cms-gallery-extra-grid';
+    wrap.appendChild(grid);
+
+    function renderThumbs() {
+      grid.innerHTML = '';
+      galleryExtraItems.forEach((url, i) => {
+        const thumb = document.createElement('div');
+        thumb.className = 'cms-gallery-extra-thumb';
+        thumb.innerHTML = `<img src="${url}" alt="">`;
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.textContent = '✕';
+        del.title = 'Entfernen';
+        del.addEventListener('click', async () => {
+          galleryExtraItems.splice(i, 1);
+          renderGalleryExtra();
+          renderThumbs();
+          await saveField('gallery_extra', JSON.stringify(galleryExtraItems));
+        });
+        thumb.appendChild(del);
+        grid.appendChild(thumb);
+      });
+    }
+    renderThumbs();
+
+    const fid = 'file-gallery-extra-add';
+    const addBtn = document.createElement('label');
+    addBtn.className = 'cms-gallery-add-btn';
+    addBtn.setAttribute('for', fid);
+    addBtn.textContent = '➕ Bilder hinzufügen';
+
+    const input = document.createElement('input');
+    input.className = 'cms-gallery-add-input';
+    input.type = 'file';
+    input.id = fid;
+    input.accept = 'image/*';
+    input.multiple = true;
+
+    input.addEventListener('change', async function () {
+      const files = Array.from(this.files || []);
+      if (!files.length) return;
+      setPanelStatus(`Lade ${files.length} Bild(er) hoch …`, 'saving');
+      try {
+        for (const file of files) {
+          const url = await uploadImage(file);
+          galleryExtraItems.push(url);
+        }
+        renderGalleryExtra();
+        renderThumbs();
+        await saveField('gallery_extra', JSON.stringify(galleryExtraItems));
+        setPanelStatus('✓ Bilder hinzugefügt', 'saved');
+      } catch {
+        setPanelStatus('⚠ Upload fehlgeschlagen', 'error');
+      }
+      input.value = '';
+    });
+
+    wrap.appendChild(addBtn);
+    wrap.appendChild(input);
+    body.appendChild(wrap);
+
+    const divider = document.createElement('div');
+    divider.className = 'cms-divider';
+    body.appendChild(divider);
   }
 
   function closePanel() {

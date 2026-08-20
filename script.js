@@ -31,16 +31,18 @@ const closeLightbox = () => {
   document.body.classList.remove("lightbox-open");
 };
 
-document.querySelectorAll(".gallery-item").forEach((item) => {
-  item.addEventListener("click", () => {
-    const thumbnail = item.querySelector("img");
-    lightboxImage.src = item.dataset.full;
-    lightboxImage.alt = thumbnail.alt;
-    lightbox.classList.add("open");
-    lightbox.setAttribute("aria-hidden", "false");
-    document.body.classList.add("lightbox-open");
-    lightboxClose.focus();
-  });
+// Event-Delegation: funktioniert auch fuer Bilder, die das CMS
+// nachtraeglich dynamisch in die Galerie einfuegt.
+document.addEventListener("click", (event) => {
+  const item = event.target.closest(".gallery-item");
+  if (!item) return;
+  const thumbnail = item.querySelector("img");
+  lightboxImage.src = item.dataset.full;
+  lightboxImage.alt = thumbnail ? thumbnail.alt : "";
+  lightbox.classList.add("open");
+  lightbox.setAttribute("aria-hidden", "false");
+  document.body.classList.add("lightbox-open");
+  lightboxClose.focus();
 });
 
 lightboxClose.addEventListener("click", closeLightbox);
