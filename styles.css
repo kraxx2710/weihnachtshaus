@@ -950,3 +950,55 @@ body.cms-active [data-cms] { min-height: 1em; }
   .impact-grid article { height: 190px; min-height: 190px !important; }
   .impact-grid p { -webkit-line-clamp: 3; }
 }
+
+/* Fliesstext-Bereiche: grosszuegig aber begrenzt,
+   damit auch versehentlich zu lange Texte das Layout nie sprengen */
+.intro-copy p:last-child,
+.causes-head p,
+.projects-head > p:last-child,
+.sponsor-head > p:last-child,
+.charity-content > p:not(.eyebrow) {
+  display: -webkit-box;
+  -webkit-line-clamp: 7;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.story-copy > p:not(.eyebrow) {
+  display: -webkit-box;
+  -webkit-line-clamp: 9;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.story-portrait blockquote { -webkit-line-clamp: 4; }
+
+/* Ueberschriften: maximal 3 Zeilen */
+.section h2, .hero h1, .closing h2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.eyebrow, .causes-kicker {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Zeitplan- und Info-Karten */
+.schedule-date strong, .hours strong { -webkit-line-clamp: 1; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+.hours small, .info-card h3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.info-card { min-height: 150px; }
+
+/* Organisationen-Liste: feste Kachelhoehe */
+.cause-list span {
+  height: 55px;
+  min-height: 55px;
+  white-space: nowrap;
+}
+@media (max-width: 520px) { .cause-list span { height: 50px; min-height: 50px; } }
