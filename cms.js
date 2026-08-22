@@ -274,11 +274,20 @@
   function apiToken() { return localStorage.getItem(TOKEN_KEY); }
 
   async function apiFetch(path, opts = {}) {
+    // WICHTIG: "...opts" muss NACH "headers" gespreitet werden, sonst
+    // ueberschreibt ein in opts.headers gesetztes Feld (z.B. Authorization)
+    // das komplette headers-Objekt und Content-Type geht verloren.
+    // Genau das hat bisher JEDE Speicherung (Text + Bild-Upload) mit
+    // HTTP 400 fehlschlagen lassen, weil der Server den JSON-Body
+    // ohne Content-Type nicht mehr parsen konnte.
     const res = await fetch(path, {
-      headers: { 'Content-Type': 'application/json', ...opts.headers },
       ...opts,
+      headers: { 'Content-Type': 'application/json', ...opts.headers },
     });
-    if (!res.ok) throw new Error(`API ${path} → ${res.status}`);
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new Error(`API ${path} → ${res.status} ${detail}`);
+    }
     return res.json();
   }
 
