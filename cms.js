@@ -332,7 +332,11 @@
   }
 
   // ── Feld speichern ────────────────────────────────────
-  let saveTimer = null;
+  // WICHTIG: Jedes Feld bekommt seinen EIGENEN Debounce-Timer.
+  // Ein frueherer globaler Timer hat beim Wechsel zwischen Feldern
+  // die Speicherung des vorherigen Feldes stillschweigend abgebrochen –
+  // die "Gespeichert"-Meldung gehoerte dann zum falschen Feld.
+  const saveTimers = new Map(); // fieldId -> { timer, getValue }
 
   async function saveField(fieldId, value) {
     setToolbarStatus('Speichert…', 'saving');
@@ -344,15 +348,34 @@
       });
       setToolbarStatus('✓ Gespeichert', 'saved');
       setTimeout(() => setToolbarStatus('Admin-Modus aktiv', ''), 2500);
+      return true;
     } catch (e) {
-      console.error('CMS save error:', e);
+      console.error('CMS save error:', fieldId, e);
       setToolbarStatus('⚠ Fehler beim Speichern', 'error');
+      return false;
     }
   }
 
   function scheduleSave(fieldId, getValue) {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => saveField(fieldId, getValue()), 900);
+    const existing = saveTimers.get(fieldId);
+    if (existing) clearTimeout(existing.timer);
+    const timer = setTimeout(() => {
+      saveTimers.delete(fieldId);
+      saveField(fieldId, getValue());
+    }, 900);
+    saveTimers.set(fieldId, { timer, getValue });
+  }
+
+  // Erzwingt SOFORTIGES Speichern aller Felder mit noch ausstehendem
+  // Timer (z.B. bevor das Panel geschlossen wird), statt die
+  // Aenderung beim Abbrechen des Timers stillschweigend zu verwerfen.
+  async function flushPendingSaves() {
+    const pending = [...saveTimers.entries()];
+    saveTimers.clear();
+    for (const [fieldId, { timer, getValue }] of pending) {
+      clearTimeout(timer);
+      await saveField(fieldId, getValue());
+    }
   }
 
   // ── Bild hochladen ────────────────────────────────────
@@ -464,6 +487,15 @@
     injectToolbar();
     injectPanel();
     wrapSections();
+
+    // Warnung statt stillem Datenverlust, falls die Seite mit
+    // noch nicht gespeicherten Aenderungen geschlossen wird.
+    window.addEventListener('beforeunload', (e) => {
+      if (saveTimers.size > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
   }
 
   function injectToolbar() {
@@ -479,7 +511,8 @@
       <button id="cms-logout">Abmelden</button>
     `;
     document.body.prepend(bar);
-    document.getElementById('cms-logout').addEventListener('click', () => {
+    document.getElementById('cms-logout').addEventListener('click', async () => {
+      await flushPendingSaves();
       localStorage.removeItem(TOKEN_KEY);
       location.reload();
     });
@@ -560,7 +593,8 @@
   }
 
   // ── Panel öffnen ──────────────────────────────────────
-  function openPanel(sec) {
+  async function openPanel(sec) {
+    await flushPendingSaves(); // vorheriges Panel evtl. noch offen -> nichts verlieren
     const panel = document.getElementById('cms-panel');
     document.getElementById('cms-panel-title').innerHTML =
       `<span class="cms-section-emoji">${sec.emoji}</span> ${sec.label}`;
@@ -735,7 +769,8 @@
     body.appendChild(divider);
   }
 
-  function closePanel() {
+  async function closePanel() {
+    await flushPendingSaves();
     document.getElementById('cms-panel').classList.remove('open');
   }
 
@@ -750,19 +785,29 @@
     const body = document.getElementById('cms-panel-body');
     const sec = SCHEMA.find(s => s.key === body.dataset.section);
     if (!sec) return;
+    await flushPendingSaves(); // keine doppelten/veralteten Auto-Saves nebenher
     const btn = document.getElementById('cms-save-all');
     btn.disabled = true;
     btn.textContent = 'Speichert …';
+    let fehler = 0;
     for (const feld of sec.felder) {
       if (feld.typ === 'image') continue;
       const wrap = body.querySelector(`[data-field-id="${feld.id}"]`);
       const editor = wrap && wrap.querySelector('[contenteditable]');
-      if (editor) await saveField(feld.id, editor.innerHTML);
+      if (editor) {
+        const ok = await saveField(feld.id, editor.innerHTML);
+        if (!ok) fehler++;
+      }
     }
     btn.disabled = false;
-    btn.textContent = '✓ Alle gespeichert';
-    setTimeout(() => { btn.textContent = '💾 Alle Änderungen speichern'; }, 2500);
-    setPanelStatus('✓ Alle Felder gespeichert', 'saved');
+    if (fehler > 0) {
+      btn.textContent = `⚠ ${fehler} Feld(er) fehlgeschlagen`;
+      setPanelStatus(`⚠ ${fehler} Feld(er) konnten nicht gespeichert werden – bitte erneut versuchen`, 'error');
+    } else {
+      btn.textContent = '✓ Alle gespeichert';
+      setPanelStatus('✓ Alle Felder gespeichert', 'saved');
+    }
+    setTimeout(() => { btn.textContent = '💾 Alle Änderungen speichern'; }, 3500);
   }
 
   function wrapSections() {
@@ -774,7 +819,7 @@
       btn.className = 'cms-edit-btn';
       btn.setAttribute('style', 'z-index: 99999 !important; position: absolute; top: 12px; right: 12px; pointer-events: all;');
       btn.innerHTML = `✏️ ${sec.label} bearbeiten`;
-      btn.addEventListener('click', e => { e.stopPropagation(); openPanel(sec); });
+      btn.addEventListener('click', async e => { e.stopPropagation(); await openPanel(sec); });
       el.appendChild(btn);
     });
   }
