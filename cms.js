@@ -394,38 +394,75 @@
   // nach Base64-Kodierung dieses Limit zuverlaessig ueberschreiten.
   // Fuer eine Webseite reicht eine deutlich kleinere Aufloesung
   // vollkommen aus und laedt fuer alle Besucher schneller.
-  function resizeImageFile(file, maxDim = 2200, quality = 0.86) {
+  function drawToCanvas(img, maxDim) {
+    let { width, height } = img;
+    if (width > maxDim || height > maxDim) {
+      if (width >= height) {
+        height = Math.round(height * (maxDim / width));
+        width = maxDim;
+      } else {
+        width = Math.round(width * (maxDim / height));
+        height = maxDim;
+      }
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+    return canvas;
+  }
+
+  function canvasToBlob(canvas, mime, quality) {
     return new Promise((resolve, reject) => {
-      const img = new Image();
-      const objectUrl = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(objectUrl);
-        let { width, height } = img;
-        if (width > maxDim || height > maxDim) {
-          if (width >= height) {
-            height = Math.round(height * (maxDim / width));
-            width = maxDim;
-          } else {
-            width = Math.round(width * (maxDim / height));
-            height = maxDim;
-          }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        // PNG mit Transparenz bleibt PNG, alles andere wird als
-        // platzsparendes JPEG gespeichert.
-        const isPng = file.type === 'image/png';
-        canvas.toBlob(
-          (blob) => (blob ? resolve({ blob, ext: isPng ? 'png' : 'jpg' }) : reject(new Error('Verkleinerung fehlgeschlagen'))),
-          isPng ? 'image/png' : 'image/jpeg',
-          quality
-        );
-      };
-      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Bild konnte nicht gelesen werden')); };
-      img.src = objectUrl;
+      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Verkleinerung fehlgeschlagen'))), mime, quality);
     });
+  }
+
+  // Verkleinert ein Bild schrittweise, bis es sicher unter Vercels
+  // 4,5-MB-Funktionslimit passt (mit Puffer fuer die Base64-Kodierung,
+  // die die Groesse um ca. 33% erhoeht). PNGs mit Transparenz bleiben
+  // nach Moeglichkeit PNG, werden aber notfalls (z.B. bei sehr grossen
+  // oder schlecht komprimierbaren Bildern) auf JPEG umgestellt, da PNG
+  // sich ueber die Qualitaetsstufe nicht verkleinern laesst.
+  const MAX_UPLOAD_BYTES = 3 * 1024 * 1024; // Puffer unter dem 4,5-MB-Limit
+
+  async function resizeImageFile(file) {
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      el.onload = () => { URL.revokeObjectURL(objectUrl); resolve(el); };
+      el.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Bild konnte nicht gelesen werden')); };
+      el.src = objectUrl;
+    });
+
+    const isPng = file.type === 'image/png';
+    const attempts = isPng
+      ? [
+          { maxDim: 2200, mime: 'image/png', quality: undefined },
+          { maxDim: 1600, mime: 'image/png', quality: undefined },
+          { maxDim: 2200, mime: 'image/jpeg', quality: 0.82 }, // Transparenz faellt weg, letzter Ausweg
+          { maxDim: 1400, mime: 'image/jpeg', quality: 0.7 },
+        ]
+      : [
+          { maxDim: 2200, mime: 'image/jpeg', quality: 0.86 },
+          { maxDim: 1800, mime: 'image/jpeg', quality: 0.78 },
+          { maxDim: 1400, mime: 'image/jpeg', quality: 0.65 },
+          { maxDim: 1000, mime: 'image/jpeg', quality: 0.55 },
+        ];
+
+    let lastBlob = null;
+    for (const step of attempts) {
+      const canvas = drawToCanvas(img, step.maxDim);
+      const blob = await canvasToBlob(canvas, step.mime, step.quality);
+      lastBlob = { blob, mime: step.mime };
+      if (blob.size <= MAX_UPLOAD_BYTES) {
+        return { blob, ext: step.mime === 'image/png' ? 'png' : 'jpg' };
+      }
+    }
+    // Alle Stufen ausgeschoepft: kleinstes Ergebnis trotzdem verwenden
+    // und den Server ueber einen klaren Fehler entscheiden lassen,
+    // statt eine garantiert zu grosse Datei erst gar nicht zu senden.
+    return { blob: lastBlob.blob, ext: lastBlob.mime === 'image/png' ? 'png' : 'jpg' };
   }
 
   function blobToBase64(blob) {
