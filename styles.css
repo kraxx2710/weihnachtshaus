@@ -1049,3 +1049,25 @@ body.cms-active [data-cms] { min-height: 1em; }
 }
 .cms-gallery-add-btn:hover { background: rgba(230,181,84,.1); border-color: #e6b554; }
 .cms-gallery-add-input { display: none; }
+
+/* Kleine Beschriftungen unter den Zahlen: kraeftiger und etwas groesser */
+.number-card span {
+  font-size: 11px;
+  font-weight: 700;
+}
+@media (max-width: 520px) {
+  .number-card span { font-size: 9px; font-weight: 700; }
+}
+
+/* Datum/Ort im Hero deutlich groesser */
+.hero-meta {
+  font-size: 16px;
+  font-weight: 600;
+  gap: 45px;
+}
+@media (max-width: 900px) {
+  .hero-meta { font-size: 13px; gap: 25px; }
+}
+@media (max-width: 520px) {
+  .hero-meta { font-size: 10px; gap: 14px; }
+}
