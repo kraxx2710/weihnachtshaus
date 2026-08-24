@@ -988,7 +988,10 @@ body.cms-active [data-cms] { min-height: 1em; }
 .visit-grid > .info-card-pair {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Gleiches Spaltenverhaeltnis wie .visit-grid selbst (1.2fr 1fr),
+     damit die goldene Karte links exakt unter der gruenen Karte
+     und die rechte exakt unter den cremefarbenen Karten liegt. */
+  grid-template-columns: 1.2fr 1fr;
   gap: 18px;
 }
 @media (max-width: 900px) {
