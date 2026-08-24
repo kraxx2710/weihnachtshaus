@@ -801,11 +801,18 @@
     function renderThumbs() {
       grid.innerHTML = '';
       galleryExtraItems.forEach((url, i) => {
+        const fid = `file-gallery-extra-replace-${i}`;
         const thumb = document.createElement('div');
         thumb.className = 'cms-gallery-extra-thumb';
-        thumb.innerHTML = `<img src="${url}" alt="">`;
+        thumb.innerHTML = `
+          <img src="${url}" alt="">
+          <label class="cms-gallery-extra-replace" for="${fid}" title="Bild ersetzen">📁</label>
+          <input class="cms-gallery-add-input" type="file" id="${fid}" accept="image/*">
+        `;
+
         const del = document.createElement('button');
         del.type = 'button';
+        del.className = 'cms-gallery-extra-delete';
         del.textContent = '✕';
         del.title = 'Entfernen';
         del.addEventListener('click', async () => {
@@ -815,6 +822,23 @@
           await saveField('gallery_extra', JSON.stringify(galleryExtraItems));
         });
         thumb.appendChild(del);
+
+        thumb.querySelector(`#${fid}`).addEventListener('change', async function () {
+          const file = this.files[0];
+          if (!file) return;
+          setPanelStatus('Bild wird ersetzt …', 'saving');
+          try {
+            const url2 = await uploadImage(file);
+            galleryExtraItems[i] = url2;
+            renderGalleryExtra();
+            renderThumbs();
+            await saveField('gallery_extra', JSON.stringify(galleryExtraItems));
+            setPanelStatus('✓ Bild ersetzt', 'saved');
+          } catch {
+            setPanelStatus('⚠ Upload fehlgeschlagen', 'error');
+          }
+        });
+
         grid.appendChild(thumb);
       });
     }

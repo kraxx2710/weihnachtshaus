@@ -949,7 +949,7 @@ body.cms-active [data-cms] { min-height: 1em; }
   object-fit: cover;
   display: block;
 }
-.cms-gallery-extra-thumb button {
+.cms-gallery-extra-delete {
   position: absolute;
   top: 4px;
   right: 4px;
@@ -965,8 +965,26 @@ body.cms-active [data-cms] { min-height: 1em; }
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 2;
 }
-.cms-gallery-extra-thumb button:hover { background: #071710; }
+.cms-gallery-extra-delete:hover { background: #071710; }
+
+/* "Bild ersetzen"-Button auf jeder Zusatzbild-Miniatur, analog zu
+   den festen Fotos 1-6 mit ihrem eigenen Upload-Button. */
+.cms-gallery-extra-replace {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 8px;
+  font-size: 18px;
+  background: linear-gradient(0deg, rgba(7,23,16,.75) 0%, transparent 55%);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity .2s;
+}
+.cms-gallery-extra-thumb:hover .cms-gallery-extra-replace { opacity: 1; }
 
 .cms-gallery-add-btn {
   display: block;
