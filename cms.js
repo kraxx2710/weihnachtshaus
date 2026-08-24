@@ -388,24 +388,29 @@
   }
 
   // ── Bild hochladen ────────────────────────────────────
+  // Direkter Upload zu Vercel Blob (Datei geht NICHT durch unsere
+  // eigene Serverless-Funktion). Grund: Vercel begrenzt den Body
+  // jeder Function hart auf 4,5 MB - ein normales Handyfoto ueberschreitet
+  // das nach Base64-Kodierung sehr leicht. Der Server stellt hier nur
+  // ein kurzlebiges Upload-Token aus, die Bytes gehen direkt zu Blob.
+  let blobUploadFn = null;
+  async function getBlobUpload() {
+    if (!blobUploadFn) {
+      const mod = await import('https://esm.sh/@vercel/blob@2.8.0/client');
+      blobUploadFn = mod.upload;
+    }
+    return blobUploadFn;
+  }
+
   async function uploadImage(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const base64 = reader.result.split(',')[1];
-          const ext = file.name.split('.').pop();
-          const { url } = await apiFetch('/api/upload', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${apiToken()}` },
-            body: JSON.stringify({ filename: `${Date.now()}.${ext}`, data: base64 }),
-          });
-          resolve(url);
-        } catch (e) { reject(e); }
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+    const upload = await getBlobUpload();
+    const ext = file.name.split('.').pop();
+    const blob = await upload(`wh/${Date.now()}.${ext}`, file, {
+      access: 'public',
+      handleUploadUrl: '/api/upload',
+      headers: { Authorization: `Bearer ${apiToken()}` },
     });
+    return blob.url;
   }
 
   // ── Toolbar-Status ────────────────────────────────────
