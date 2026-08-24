@@ -1,27 +1,21 @@
-import { handleUpload } from '@vercel/blob/client';
+import { put } from '@vercel/blob';
 
-// Direkter Client-Upload: der Browser laedt das Bild direkt zu Vercel Blob
-// hoch, hier wird nur ein kurzlebiges Upload-Token ausgestellt. Dadurch
-// umgeht der Upload das harte 4,5-MB-Limit fuer Vercel-Function-Bodies,
-// das echte Handyfotos sonst zuverlaessig ueberschreiten wuerden.
-export default async function handler(request, response) {
-  try {
-    const jsonResponse = await handleUpload({
-      body: request.body,
-      request,
-      onBeforeGenerateToken: async () => {
-        if (request.headers.authorization !== `Bearer ${process.env.CMS_SECRET_TOKEN}`) {
-          throw new Error('Unauthorized');
-        }
-        return {
-          allowedContentTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'],
-          addRandomSuffix: true,
-        };
-      },
-      onUploadCompleted: async () => {},
-    });
-    return response.status(200).json(jsonResponse);
-  } catch (error) {
-    return response.status(400).json({ error: error.message });
+export const config = {
+  api: { bodyParser: { sizeLimit: '10mb' } },
+};
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).end();
+
+  if (req.headers.authorization !== `Bearer ${process.env.CMS_SECRET_TOKEN}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
+
+  const { filename, data } = req.body;
+  if (!filename || !data) return res.status(400).json({ error: 'filename und data erforderlich' });
+
+  const buffer = Buffer.from(data, 'base64');
+  const blob = await put(`wh/${filename}`, buffer, { access: 'public', addRandomSuffix: true });
+
+  res.json({ url: blob.url });
 }

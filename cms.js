@@ -388,29 +388,70 @@
   }
 
   // ── Bild hochladen ────────────────────────────────────
-  // Direkter Upload zu Vercel Blob (Datei geht NICHT durch unsere
-  // eigene Serverless-Funktion). Grund: Vercel begrenzt den Body
-  // jeder Function hart auf 4,5 MB - ein normales Handyfoto ueberschreitet
-  // das nach Base64-Kodierung sehr leicht. Der Server stellt hier nur
-  // ein kurzlebiges Upload-Token aus, die Bytes gehen direkt zu Blob.
-  let blobUploadFn = null;
-  async function getBlobUpload() {
-    if (!blobUploadFn) {
-      const mod = await import('https://esm.sh/@vercel/blob@2.8.0/client');
-      blobUploadFn = mod.upload;
-    }
-    return blobUploadFn;
+  // Bild vor dem Hochladen im Browser verkleinern. Grund: Vercel
+  // begrenzt den Body jeder Serverless-Funktion HART auf 4,5 MB
+  // (nicht konfigurierbar) - ein normales Handyfoto (3-8 MB) wuerde
+  // nach Base64-Kodierung dieses Limit zuverlaessig ueberschreiten.
+  // Fuer eine Webseite reicht eine deutlich kleinere Aufloesung
+  // vollkommen aus und laedt fuer alle Besucher schneller.
+  function resizeImageFile(file, maxDim = 2200, quality = 0.86) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width >= height) {
+            height = Math.round(height * (maxDim / width));
+            width = maxDim;
+          } else {
+            width = Math.round(width * (maxDim / height));
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        // PNG mit Transparenz bleibt PNG, alles andere wird als
+        // platzsparendes JPEG gespeichert.
+        const isPng = file.type === 'image/png';
+        canvas.toBlob(
+          (blob) => (blob ? resolve({ blob, ext: isPng ? 'png' : 'jpg' }) : reject(new Error('Verkleinerung fehlgeschlagen'))),
+          isPng ? 'image/png' : 'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Bild konnte nicht gelesen werden')); };
+      img.src = objectUrl;
+    });
+  }
+
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   }
 
   async function uploadImage(file) {
-    const upload = await getBlobUpload();
-    const ext = file.name.split('.').pop();
-    const blob = await upload(`wh/${Date.now()}.${ext}`, file, {
-      access: 'public',
-      handleUploadUrl: '/api/upload',
+    // SVGs sind bereits winzig und lassen sich nicht rastern -> unveraendert senden.
+    let blob = file, ext = file.name.split('.').pop().toLowerCase();
+    if (file.type !== 'image/svg+xml') {
+      const resized = await resizeImageFile(file);
+      blob = resized.blob;
+      ext = resized.ext;
+    }
+    const base64 = await blobToBase64(blob);
+    const { url } = await apiFetch('/api/upload', {
+      method: 'POST',
       headers: { Authorization: `Bearer ${apiToken()}` },
+      body: JSON.stringify({ filename: `${Date.now()}.${ext}`, data: base64 }),
     });
-    return blob.url;
+    return url;
   }
 
   // ── Toolbar-Status ────────────────────────────────────

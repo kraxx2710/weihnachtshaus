@@ -851,98 +851,34 @@ footer .brand small{margin-top:5px;font-size:8px;letter-spacing:.18em;color:#afb
   word-break: break-word;
 }
 
-/* ── Nur am Desktop: feste Kartenhoehen ─────────────────── */
+/* ── Nur am Desktop: Mindesthoehen fuer ein ruhiges Raster ──
+   WICHTIG: Hier wird NIE Text abgeschnitten (kein overflow:hidden
+   auf Textboxen mehr) - laengerer Text laesst die jeweilige Karte
+   einfach etwas hoeher werden, statt echten Inhalt zu verstecken.
+   Kurze Texte (der Normalfall) sehen weiterhin einheitlich aus. */
 @media (min-width: 901px) {
 
   /* Projektkarten */
-  .project-card { height: 610px; min-height: 610px !important; }
+  .project-card { min-height: 610px; }
   .project-card div {
-    height: 300px;
-    overflow: hidden;
+    min-height: 300px;
     display: flex;
     flex-direction: column;
     justify-content: center;
   }
-  .project-card h3 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    margin: 9px 0 14px;
-  }
-  .project-card p {
-    display: -webkit-box;
-    -webkit-line-clamp: 5;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    margin: 0;
-  }
-
-  /* Feature-Karten */
-  .feature h3 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .feature.quote p {
-    display: -webkit-box;
-    -webkit-line-clamp: 6;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
+  .project-card h3 { margin: 9px 0 14px; }
 
   /* Wirkungs-Karten */
-  .impact-grid article { height: 245px; min-height: 245px !important; overflow: hidden; }
-  .impact-grid p {
-    display: -webkit-box;
-    -webkit-line-clamp: 4;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
+  .impact-grid article { min-height: 245px; }
 
   /* Zeitleiste */
-  .history-timeline article { height: 260px; overflow: hidden; }
-  .history-timeline p {
-    display: -webkit-box;
-    -webkit-line-clamp: 5;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
+  .history-timeline article { min-height: 260px; }
 
-  /* Zahlen-Kacheln */
-  .number-card span {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    min-height: 2.4em;
-  }
+  /* Zahlen-Kacheln: Mindesthoehe fuer Ausrichtung, ohne zu clippen */
+  .number-card span { min-height: 2.4em; }
 
   /* Info-Karten */
   .info-card { min-height: 150px; }
-  .info-card p {
-    display: -webkit-box;
-    -webkit-line-clamp: 4;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  /* Portrait-Zitat */
-  .story-portrait blockquote {
-    display: -webkit-box;
-    -webkit-line-clamp: 5;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  /* Ueberschriften maximal 3 Zeilen */
-  .section h2, .closing h2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
 }
 
 /* Editierbare Felder im Admin-Modus: kein Layout-Sprung */
@@ -1059,15 +995,33 @@ body.cms-active [data-cms] { min-height: 1em; }
   .number-card span { font-size: 9px; font-weight: 700; }
 }
 
-/* Datum/Ort im Hero deutlich groesser */
+/* Datum/Ort im Hero deutlich groesser, aber Zeilen eng beieinander
+   (Layout ist eine Spalte - "gap" ist hier der Abstand ZWISCHEN
+   den beiden Zeilen, nicht seitlich) */
 .hero-meta {
   font-size: 16px;
   font-weight: 600;
-  gap: 45px;
+  gap: 6px;
 }
 @media (max-width: 900px) {
-  .hero-meta { font-size: 13px; gap: 25px; }
+  .hero-meta { font-size: 13px; gap: 5px; }
 }
 @media (max-width: 520px) {
-  .hero-meta { font-size: 10px; gap: 14px; }
+  .hero-meta { font-size: 10px; gap: 4px; }
+}
+
+/* "VON / BIS" und die Jahreszahlen im Besuchsplaner groesser */
+.schedule-date span, .schedule-date small {
+  font-size: 13px;
+  font-weight: 700;
+}
+@media (max-width: 520px) {
+  .schedule-date span, .schedule-date small { font-size: 11px; }
+}
+
+/* Absicherung: lange Monatsnamen (z.B. "Jänner") brechen um statt
+   aus der schmalen Spalte hinauszulaufen */
+.schedule-date strong, .schedule-date b {
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
