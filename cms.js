@@ -84,6 +84,9 @@
         { id: 'visit_hours',      label: 'Öffnungszeiten',         typ: 'text' },
         { id: 'visit_hours_note', label: 'Hinweis zu den Zeiten',  typ: 'text' },
         { id: 'visit_tip_text',   label: 'Tipp – Text',            typ: 'textarea' },
+        { id: 'visit_kutsche_h3',   label: 'Pferdekutsche – Überschrift', typ: 'text' },
+        { id: 'visit_kutsche_text', label: 'Pferdekutsche – Text',        typ: 'textarea' },
+        { id: 'visit_zug_h3',     label: 'Bummelzug – Überschrift', typ: 'text' },
         { id: 'visit_zug_text',   label: 'Bummelzug – Text',       typ: 'textarea' },
       ]
     },
