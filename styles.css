@@ -1036,3 +1036,14 @@ body.cms-active [data-cms] { min-height: 1em; }
   /* Das mobile-opening-banner ganz oben zeigt das Datum bereits an */
   .hero-badge { display: none; }
 }
+
+/* Datum ("21. November" / "06. Jänner") 5px kleiner */
+.schedule-date strong {
+  font-size: clamp(30px, 4vw, 53px);
+}
+@media (max-width: 900px) {
+  .schedule-date strong { font-size: 30px; }
+}
+@media (max-width: 520px) {
+  .schedule-date strong { font-size: 37px; }
+}
