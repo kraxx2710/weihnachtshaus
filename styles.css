@@ -1296,3 +1296,9 @@ footer .footer-note {
   }
   .causes .impact-grid strong { font-size: 30px; }
 }
+
+/* Absicherung: geoeffnetes mobiles Menue gewinnt IMMER gegen die
+   Ausgangsposition (translateX(100%)), unabhaengig von Kaskade-Eigenheiten */
+@media (max-width: 900px) {
+  .main-nav.open { transform: none !important; }
+}
