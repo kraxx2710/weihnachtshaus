@@ -304,6 +304,7 @@
       key: 'abschluss', emoji: '🌙', label: 'Abschluss / Einladung',
       selector: '.closing',
       felder: [
+        { id: 'closing_bg',      label: 'Hintergrundbild',              typ: 'image' },
         { id: 'closing_eyebrow', label: 'Kleiner Text',                typ: 'text' },
         { id: 'closing_h2_1',    label: 'Überschrift Zeile 1',         typ: 'text' },
         { id: 'closing_h2_2',    label: 'Überschrift Zeile 2 (kursiv)', typ: 'text' },
