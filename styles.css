@@ -1302,3 +1302,6 @@ footer .footer-note {
 @media (max-width: 900px) {
   .main-nav.open { transform: none !important; }
 }
+
+/* Zahlen-Kacheln: Inhalt mittig zentriert */
+.number-card { text-align: center; }
