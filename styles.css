@@ -1339,3 +1339,16 @@ footer .footer-note {
   .number-card strong { font-size: 26px; }
   .schedule-date strong { font-size: 36px; }
 }
+
+/* ══════════════════════════════════════════════════════════
+   ÜBERSCHRIFTEN: echte deutsche Silbentrennung statt hartem
+   Umbruch mitten im Wort ohne Bindestrich ("Weihnachtswunde/r").
+   html lang="de" ist gesetzt, der Browser trennt an Silben.
+══════════════════════════════════════════════════════════ */
+.hero h1, .section h2, .closing h2,
+.feature h3, .project-card h3, .info-card h3,
+.duo-card-body h3, .history-timeline h3 {
+  word-break: normal;
+  -webkit-hyphens: auto;
+  hyphens: auto;
+}
