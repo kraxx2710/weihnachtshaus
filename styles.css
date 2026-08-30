@@ -1184,3 +1184,14 @@ body.cms-active [data-cms] { min-height: 1em; }
 
 /* Fix: "Viele" darf nicht mitten im Wort umbrechen */
 .impact-grid strong { word-break: normal; overflow-wrap: normal; white-space: nowrap; }
+
+/* KI-Transparenzhinweis im Footer */
+footer .footer-note {
+  grid-column: 1 / -1;
+  margin: 14px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid #ffffff12;
+  font-size: 10px;
+  color: #7d8a82;
+  text-align: center;
+}
