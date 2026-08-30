@@ -145,6 +145,8 @@
         { id: 'causes_kicker',   label: 'Kicker-Text oben',       typ: 'text' },
         { id: 'causes_h2',       label: 'Überschrift',             typ: 'text' },
         { id: 'causes_text',     label: 'Beschreibungstext',       typ: 'textarea' },
+        { id: 'causes_img',      label: 'Emotionales Bild',        typ: 'image' },
+        { id: 'causes_caption',  label: 'Bild – Zitatzeile',       typ: 'text' },
         { id: 'causes_imp1_num', label: 'Impact 1 – Zahl',         typ: 'text' },
         { id: 'causes_imp1_lbl', label: 'Impact 1 – Bezeichnung',  typ: 'text' },
         { id: 'causes_imp1_text',label: 'Impact 1 – Text',         typ: 'textarea' },

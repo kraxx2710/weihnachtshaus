@@ -1140,3 +1140,47 @@ body.cms-active [data-cms] { min-height: 1em; }
   .specialdays-image { box-shadow: 10px 10px 0 #e6b55440; }
   .schedule-date span, .schedule-date small { font-size: 13px; }
 }
+
+/* ══════════════════════════════════════════════════════════
+   CAUSES – Emotionale Bildkarte mit Logo-Stern & Zitat
+══════════════════════════════════════════════════════════ */
+.causes-figure {
+  grid-column: 1 / -1;
+  margin: 45px 0 0;
+  border: 1px solid #07171033;
+  box-shadow: 16px 16px 0 #0717101c;
+  background: var(--ink);
+}
+.causes-figure img {
+  display: block;
+  width: 100%;
+  height: 380px;
+  object-fit: cover;
+}
+.causes-figure figcaption {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 26px;
+  background: var(--ink);
+  color: var(--cream);
+}
+.causes-figure figcaption svg {
+  width: 30px;
+  height: 30px;
+  fill: var(--gold);
+  flex-shrink: 0;
+}
+.causes-figure figcaption span {
+  font: 700 19px/1.35 "Playfair Display", serif;
+  font-style: italic;
+}
+@media (max-width: 900px) {
+  .causes-figure { margin-top: 30px; box-shadow: 8px 8px 0 #0717101c; }
+  .causes-figure img { height: 240px; }
+  .causes-figure figcaption { padding: 16px 18px; gap: 12px; }
+  .causes-figure figcaption span { font-size: 16px; }
+}
+
+/* Fix: "Viele" darf nicht mitten im Wort umbrechen */
+.impact-grid strong { word-break: normal; overflow-wrap: normal; white-space: nowrap; }
