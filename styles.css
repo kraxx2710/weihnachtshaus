@@ -1305,3 +1305,37 @@ footer .footer-note {
 
 /* Zahlen-Kacheln: Inhalt mittig zentriert */
 .number-card { text-align: center; }
+
+/* ══════════════════════════════════════════════════════════
+   RESPONSIVE SCHRIFT ohne Zeilenumbruch
+   "900.000+" und "November"/"Jänner" duerfen NIE umbrechen -
+   stattdessen skaliert die Schrift fein mit der Fensterbreite.
+══════════════════════════════════════════════════════════ */
+.number-card strong {
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: none;
+  /* passt "900.000+" bei jeder Breite in die Viertel-Kachel */
+  font-size: min(54px, calc(2.6vw + 12px));
+}
+.schedule-date strong,
+.schedule-date strong b {
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: none;
+}
+.schedule-date strong {
+  /* passt "November" bei jeder Breite in die halbe Zeitplan-Karte */
+  font-size: min(53px, calc(2.6vw + 8px));
+}
+@media (max-width: 900px) {
+  /* volle Breite -> wieder feste, gut lesbare Groessen */
+  .number-card strong { font-size: 30px; }
+  .schedule-date strong { font-size: 30px; }
+}
+@media (max-width: 520px) {
+  .number-card strong { font-size: 26px; }
+  .schedule-date strong { font-size: 36px; }
+}
