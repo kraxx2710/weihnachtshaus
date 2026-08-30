@@ -1098,3 +1098,45 @@ body.cms-active [data-cms] { min-height: 1em; }
   .duo-card-body h3 { font-size: 26px; }
   .duo-head { margin-bottom: 35px; }
 }
+
+/* ══════════════════════════════════════════════════════════
+   GRÖSSERE BESCHRIFTUNGEN (Wunsch: kleine Labels besser lesbar)
+══════════════════════════════════════════════════════════ */
+.visit .eyebrow, .duo-section .eyebrow { font-size: 14px; }
+.schedule-date span, .schedule-date small { font-size: 15px; }
+.hours > span { font-size: 14px; }
+.info-card small { font-size: 12px; }
+
+/* ══════════════════════════════════════════════════════════
+   SPECIAL-DAYS – Text links, Bild rechts
+══════════════════════════════════════════════════════════ */
+.specialdays { background: var(--pine); color: var(--cream); }
+.specialdays-grid {
+  display: grid;
+  grid-template-columns: 1.15fr .85fr;
+  gap: 6vw;
+  align-items: center;
+}
+.specialdays-copy h2 { font-size: clamp(46px, 5.5vw, 84px); margin-bottom: 30px; }
+.specialdays-copy p:not(.eyebrow) {
+  font-size: 15px;
+  line-height: 1.85;
+  color: #c8d3cc;
+  margin: 0 0 18px;
+}
+.specialdays-image {
+  position: relative;
+  box-shadow: 20px 20px 0 #e6b55440;
+}
+.specialdays-image img {
+  display: block;
+  width: 100%;
+  height: 560px;
+  object-fit: cover;
+}
+@media (max-width: 900px) {
+  .specialdays-grid { grid-template-columns: 1fr; gap: 30px; }
+  .specialdays-image img { height: 320px; }
+  .specialdays-image { box-shadow: 10px 10px 0 #e6b55440; }
+  .schedule-date span, .schedule-date small { font-size: 13px; }
+}

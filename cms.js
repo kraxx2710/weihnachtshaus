@@ -83,6 +83,7 @@
         { id: 'visit_bis_year',   label: 'Ende – Jahr',            typ: 'text' },
         { id: 'visit_hours',      label: 'Öffnungszeiten',         typ: 'text' },
         { id: 'visit_hours_note', label: 'Hinweis zu den Zeiten',  typ: 'text' },
+        { id: 'visit_tip_h3',     label: 'Tipp – Überschrift',     typ: 'text' },
         { id: 'visit_tip_text',   label: 'Tipp – Text',            typ: 'textarea' },
       ]
     },
@@ -112,6 +113,17 @@
         { id: 'geniesser2_img',    label: 'Maroni-Brater – Bild',       typ: 'image' },
         { id: 'geniesser2_h3',     label: 'Maroni-Brater – Überschrift',typ: 'text' },
         { id: 'geniesser2_text',   label: 'Maroni-Brater – Text',       typ: 'textarea' },
+      ]
+    },
+    {
+      key: 'specialdays', emoji: '🎭', label: 'Special-Days',
+      selector: '.specialdays',
+      felder: [
+        { id: 'specialdays_eyebrow', label: 'Kleiner Text oben', typ: 'text' },
+        { id: 'specialdays_h2',      label: 'Überschrift',       typ: 'text' },
+        { id: 'specialdays_text1',   label: 'Absatz 1',          typ: 'textarea' },
+        { id: 'specialdays_text2',   label: 'Absatz 2',          typ: 'textarea' },
+        { id: 'specialdays_img',     label: 'Bild',              typ: 'image' },
       ]
     },
     {
