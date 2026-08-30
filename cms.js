@@ -84,10 +84,34 @@
         { id: 'visit_hours',      label: 'Öffnungszeiten',         typ: 'text' },
         { id: 'visit_hours_note', label: 'Hinweis zu den Zeiten',  typ: 'text' },
         { id: 'visit_tip_text',   label: 'Tipp – Text',            typ: 'textarea' },
+      ]
+    },
+    {
+      key: 'anreise', emoji: '🚂', label: 'Bequem anreisen',
+      selector: '.arrive',
+      felder: [
+        { id: 'anreise_eyebrow',    label: 'Kleiner Text oben',           typ: 'text' },
+        { id: 'anreise_h2',         label: 'Überschrift',                 typ: 'text' },
+        { id: 'anreise1_img',       label: 'Pferdekutsche – Bild',        typ: 'image' },
         { id: 'visit_kutsche_h3',   label: 'Pferdekutsche – Überschrift', typ: 'text' },
         { id: 'visit_kutsche_text', label: 'Pferdekutsche – Text',        typ: 'textarea' },
-        { id: 'visit_zug_h3',     label: 'Bummelzug – Überschrift', typ: 'text' },
-        { id: 'visit_zug_text',   label: 'Bummelzug – Text',       typ: 'textarea' },
+        { id: 'anreise2_img',       label: 'Bummelzug – Bild',            typ: 'image' },
+        { id: 'visit_zug_h3',       label: 'Bummelzug – Überschrift',     typ: 'text' },
+        { id: 'visit_zug_text',     label: 'Bummelzug – Text',            typ: 'textarea' },
+      ]
+    },
+    {
+      key: 'geniesser', emoji: '🌰', label: 'Für Genießer',
+      selector: '.enjoy',
+      felder: [
+        { id: 'geniesser_eyebrow', label: 'Kleiner Text oben',          typ: 'text' },
+        { id: 'geniesser_h2',      label: 'Überschrift',                typ: 'text' },
+        { id: 'geniesser1_img',    label: 'Therme Avita – Bild',        typ: 'image' },
+        { id: 'geniesser1_h3',     label: 'Therme Avita – Überschrift', typ: 'text' },
+        { id: 'geniesser1_text',   label: 'Therme Avita – Text',        typ: 'textarea' },
+        { id: 'geniesser2_img',    label: 'Maroni-Brater – Bild',       typ: 'image' },
+        { id: 'geniesser2_h3',     label: 'Maroni-Brater – Überschrift',typ: 'text' },
+        { id: 'geniesser2_text',   label: 'Maroni-Brater – Text',       typ: 'textarea' },
       ]
     },
     {
