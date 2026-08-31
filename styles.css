@@ -1432,3 +1432,12 @@ footer .footer-note {
   object-fit: contain;
   mix-blend-mode: multiply;
 }
+
+/* Sponsor-Kacheln skalieren stufenlos mit der Fensterbreite:
+   Hoehe folgt der Spaltenbreite ueber ein festes Seitenverhaeltnis
+   (statt fixer Pixel-Hoehen je Breakpoint) - die Logos wachsen und
+   schrumpfen dadurch fluessig mit der Webseite. */
+.sponsor-grid a {
+  height: auto !important;
+  aspect-ratio: 8 / 5;
+}
