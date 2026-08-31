@@ -126,7 +126,7 @@ footer .brand small{margin-top:5px;font-size:8px;letter-spacing:.18em;color:#afb
   object-view-box:var(--logo-view-box, inset(0));
   mix-blend-mode:multiply;
 }
-.sponsor-grid a:nth-child(10) img,.sponsor-grid a:nth-child(13) img,.sponsor-grid a:nth-child(14) img,.sponsor-grid a:nth-child(18) img{max-width:none!important;max-height:none!important}
+
 @media(max-width:900px){.sponsor-grid a{padding:24px}}
 @media(max-width:520px){.sponsor-grid a{padding:19px}}
 
@@ -1413,3 +1413,22 @@ footer .footer-note {
   transform: translateY(-2px);
 }
 .info-card a:hover::after { transform: translateX(3px); }
+
+
+/* ══════════════════════════════════════════════════════════
+   SPONSOR-GRID FINAL: Alle Logos sind jetzt vor dem Upload
+   maschinell normalisiert (Weissrand entfernt, identische
+   Logo-Box, identischer Rand im Bild). Die Kachel zeigt das
+   Bild daher einfach vollflaechig per contain - keine
+   Prozent-Tricks, keine Ausnahmen mehr.
+══════════════════════════════════════════════════════════ */
+.sponsor-grid a { padding: 10px !important; }
+.sponsor-grid img,
+.sponsor-grid a img {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+}
