@@ -1341,16 +1341,28 @@ footer .footer-note {
 }
 
 /* ══════════════════════════════════════════════════════════
-   ÜBERSCHRIFTEN: echte deutsche Silbentrennung statt hartem
-   Umbruch mitten im Wort ohne Bindestrich ("Weihnachtswunde/r").
-   html lang="de" ist gesetzt, der Browser trennt an Silben.
+   ÜBERSCHRIFTEN-UMBRUCH:
+   Desktop: NIE Silbentrennung - ein Wort, das nicht mehr in die
+   Zeile passt, rutscht komplett in die naechste (genug Platz da).
+   Nur auf schmalen Screens (wo ein Einzelwort wie
+   "Weihnachtswunder." breiter als die ganze Zeile sein kann)
+   greift deutsche Silbentrennung als Notloesung.
 ══════════════════════════════════════════════════════════ */
 .hero h1, .section h2, .closing h2,
 .feature h3, .project-card h3, .info-card h3,
 .duo-card-body h3, .history-timeline h3 {
   word-break: normal;
-  -webkit-hyphens: auto;
-  hyphens: auto;
+  -webkit-hyphens: none;
+  hyphens: none;
+  overflow-wrap: break-word;
+}
+@media (max-width: 600px) {
+  .hero h1, .section h2, .closing h2,
+  .feature h3, .project-card h3, .info-card h3,
+  .duo-card-body h3, .history-timeline h3 {
+    -webkit-hyphens: auto;
+    hyphens: auto;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════
