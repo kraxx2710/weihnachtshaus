@@ -284,8 +284,6 @@
         { id: 'sp29_url', label: 'Link 29 – Stipits',            typ: 'text' },
         { id: 'sp30_img', label: 'Logo 30 – Ritter Sport',       typ: 'image' },
         { id: 'sp30_url', label: 'Link 30 – Ritter Sport',       typ: 'text' },
-        { id: 'sp31_img', label: 'Logo 31 – Fronius',            typ: 'image' },
-        { id: 'sp31_url', label: 'Link 31 – Fronius',            typ: 'text' },
       ]
     },
     {
