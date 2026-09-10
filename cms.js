@@ -636,7 +636,7 @@
   function loadAdminAssets() {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = 'cms.css?v=5';
+    link.href = 'cms.css?v=6';
     document.head.appendChild(link);
     if (localStorage.getItem(TOKEN_KEY)) {
       startAdminMode();
@@ -1202,11 +1202,17 @@
       </div>
       <div class="cms-media-row cms-media-selrow ${sel ? 'has-sel' : ''}">
         <button class="cms-mbtn" data-act="selall">${sel && sel === a.items.length ? '☐ Auswahl aufheben' : '☑ Alle auswählen'}</button>
-        <span class="cms-selcount">${sel ? `<b>${sel}</b> ausgewählt` : 'Klick = auswählen · Shift+Klick = Bereich · Doppelklick = groß ansehen · Ziehen = sortieren'}</span>
+        <span class="cms-selcount">${sel ? `<b>${sel}</b> ausgewählt` : 'Klick = auswählen · Shift+Klick = Bereich · Doppelklick = groß ansehen · Ziehen = sortieren · ⧉ = auch in anderen Ordnern'}</span>
         <span class="spacer"></span>
         <button class="cms-mbtn" data-act="hide" ${sel ? '' : 'disabled'}>👁 Aus-/Einblenden</button>
         <label class="cms-mbtn ${sel && andere.length ? '' : 'is-disabled'}">➜ Verschieben nach
           <select data-act="move" ${sel && andere.length ? '' : 'disabled'}>
+            <option value="">…</option>
+            ${andere.map(x => `<option value="${esc(x.id)}">${esc(x.title)} (${esc((MEDIA_KINDS.find(k => k.key === x.kind) || {}).label || x.kind)})</option>`).join('')}
+          </select>
+        </label>
+        <label class="cms-mbtn ${sel && andere.length ? '' : 'is-disabled'}" title="Bild bleibt hier und erscheint zusätzlich im Zielordner (kein erneuter Upload)">⧉ Kopieren nach
+          <select data-act="copy" ${sel && andere.length ? '' : 'disabled'}>
             <option value="">…</option>
             ${andere.map(x => `<option value="${esc(x.id)}">${esc(x.title)} (${esc((MEDIA_KINDS.find(k => k.key === x.kind) || {}).label || x.kind)})</option>`).join('')}
           </select>
@@ -1269,7 +1275,30 @@
       mediaSelected.clear();
       renderMediaAside(); renderMediaMain();
     };
+    tools.querySelector('[data-act="copy"]').onchange = async function () {
+      const ziel = mediaAlbums.find(x => x.id === this.value);
+      if (!ziel) return;
+      const vorhanden = new Set(ziel.items.map(itemKey));
+      const kopien = a.items.filter(i => mediaSelected.has(i.id) && !vorhanden.has(itemKey(i)))
+        .map(i => ({ ...i, id: newId(), hidden: false }));
+      const doppelt = mediaSelected.size - kopien.length;
+      if (!kopien.length) { setMediaStatus(`Alle ausgewählten Einträge sind in „${ziel.title}" bereits vorhanden`, 'error'); this.value = ''; return; }
+      ziel.items.push(...kopien);
+      const ok = await saveAlbum(ziel, `✓ ${kopien.length} nach „${ziel.title}" kopiert – bleiben auch hier${doppelt ? ` · ${doppelt} waren dort schon` : ''}`);
+      if (!ok) await loadMedia();
+      renderMediaAside(); renderMediaGrid();
+      this.value = '';
+    };
     tools.querySelector('[data-act="del"]').onclick = deleteSelected;
+  }
+
+  // Gleiches Bild / gleicher Link in verschiedenen Ordnern erkennen
+  function itemKey(it) { return it.type === 'link' ? `link:${it.link}` : `url:${it.url}`; }
+
+  // Welche anderen Ordner zeigen denselben Eintrag?
+  function otherAlbumsWith(it, current) {
+    const key = itemKey(it);
+    return mediaAlbums.filter(al => al.id !== current.id && al.items.some(x => itemKey(x) === key)).map(al => al.title);
   }
 
   async function toggleHiddenSelected() {
@@ -1291,8 +1320,12 @@
     a.items = a.items.filter(i => !mediaSelected.has(i.id));
     const ok = await saveAlbum(a, `✓ ${n} Einträge gelöscht`);
     if (ok) {
-      const urls = weg.flatMap(i => [i.url, i.thumb]).filter(Boolean);
-      mediaPost({ op: 'deleteBlobs', urls }).catch(() => {});
+      // Dateien nur loeschen, wenn kein anderer Ordner sie noch verwendet
+      const nochGenutzt = new Set(mediaAlbums.flatMap(al => al.items).flatMap(i => [i.url, i.thumb]).filter(Boolean));
+      const urls = weg.flatMap(i => [i.url, i.thumb]).filter(u => u && !nochGenutzt.has(u));
+      if (urls.length) mediaPost({ op: 'deleteBlobs', urls }).catch(() => {});
+      const behalten = weg.length - new Set(weg.filter(i => nochGenutzt.has(i.url)).map(i => i.id)).size;
+      if (behalten < weg.length) setMediaStatus(`✓ ${n} Einträge entfernt · Dateien bleiben erhalten, da sie in anderen Ordnern verwendet werden`, 'saved');
     } else {
       await loadMedia();
     }
@@ -1381,6 +1414,7 @@
       cell.dataset.idx = idx;
       cell.dataset.id = it.id;
       const meta = [it.source, it.date].filter(Boolean).join(' · ');
+      const auchIn = otherAlbumsWith(it, a);
       const inhalt = it.type === 'image'
         ? `<img src="${esc(it.thumb || it.url)}" alt="" loading="lazy" decoding="async">`
         : `<div class="cms-mdoc"><b>${it.type === 'pdf' ? 'PDF' : 'LINK'}</b><span>${esc(it.title || it.name || it.link)}</span>${meta ? `<span style="color:#ffffff88">${esc(meta)}</span>` : ''}</div>`;
@@ -1389,6 +1423,7 @@
         <input type="checkbox" ${mediaSelected.has(it.id) ? 'checked' : ''} title="Auswählen" tabindex="-1">
         <span class="cms-mnum">${idx + 1}</span>
         ${it.hidden ? '<span class="cms-mbadge">versteckt</span>' : (it.type === 'image' && it.title ? `<span class="cms-mbadge cms-mbadge--title">${esc(it.title)}</span>` : '')}
+        ${auchIn.length ? `<span class="cms-malso" title="Auch in: ${esc(auchIn.join(', '))}">⧉ ${auchIn.length}</span>` : ''}
         <div class="cms-mactions">
           <button type="button" data-act="edit" title="Titel, Quelle, Datum">✎</button>
           <button type="button" data-act="hide" title="${it.hidden ? 'Einblenden' : 'Ausblenden'}">${it.hidden ? '👁' : '🙈'}</button>

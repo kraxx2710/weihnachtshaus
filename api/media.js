@@ -171,7 +171,15 @@ export default async function handler(req, res) {
         await writeIndex(index);
         await redis('HDEL', HASH, `album:${id}`);
         let geloescht = 0;
-        if (album) geloescht = await deleteBlobs(album.items.flatMap(i => [i.url, i.thumb]));
+        if (album) {
+          // Dateien, die andere Ordner noch verwenden, bleiben erhalten
+          const genutzt = new Set();
+          for (const e of index) {
+            const other = await readAlbum(e.id);
+            (other?.items || []).forEach(i => { if (i.url) genutzt.add(i.url); if (i.thumb) genutzt.add(i.thumb); });
+          }
+          geloescht = await deleteBlobs(album.items.flatMap(i => [i.url, i.thumb]).filter(u => u && !genutzt.has(u)));
+        }
         return res.json({ ok: true, blobsGeloescht: geloescht });
       }
       case 'deleteBlobs': {
