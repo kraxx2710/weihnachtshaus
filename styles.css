@@ -1510,7 +1510,7 @@ footer .footer-links a:hover { color: #fff; }
 /* ══════════════════════════════════════════════════════════
    GROSSANSICHT (Lightbox) mit Blättern und Vorschauleiste
 ══════════════════════════════════════════════════════════ */
-.lightbox { display: flex !important; flex-direction: column; padding: 0 !important; place-items: unset; background: #020906f2; touch-action: pan-y; }
+.lightbox { display: flex !important; flex-direction: column; padding: 0 !important; place-items: unset; background: #020906fa; touch-action: pan-y; }
 .lb-top { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; min-height: 64px; }
 .lb-counter { color: #ffffffaa; font: 600 12px/1 "DM Sans", sans-serif; letter-spacing: .12em; }
 .lightbox .lightbox-close { position: static !important; width: auto; height: 40px; padding: 0 16px; font: 600 10px/1 "DM Sans", sans-serif; text-transform: uppercase; letter-spacing: .12em; }
