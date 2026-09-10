@@ -1173,6 +1173,7 @@
     const kind = MEDIA_KINDS.find(k => k.key === a.kind) || MEDIA_KINDS[0];
     const sel = mediaSelected.size;
     const andere = mediaAlbums.filter(x => x.id !== a.id);
+    const ohneThumb = a.items.filter(needsThumb);
 
     tools.innerHTML = `
       <span class="cms-media-title">${esc(a.title)}</span>
@@ -1191,6 +1192,7 @@
         </select>
       </label>
       <button class="cms-mbtn danger" data-act="del" ${sel ? '' : 'disabled'}>🗑 Löschen (${sel})</button>
+      ${ohneThumb.length ? `<button class="cms-mbtn" data-act="thumbs" title="Erzeugt kleine Vorschaubilder – die Seite lädt dann deutlich schneller und verbraucht weniger Datenvolumen">🖼 Vorschaubilder erzeugen (${ohneThumb.length})</button>` : ''}
     `;
     tools.querySelector('.cms-media-title').title = kind.hint;
 
@@ -1264,7 +1266,50 @@
       renderMediaAside(); renderMediaMain();
     };
 
+    const thumbsBtn = tools.querySelector('[data-act="thumbs"]');
+    if (thumbsBtn) thumbsBtn.onclick = () => generateMissingThumbs(a);
+
     renderMediaGrid();
+  }
+
+  // Bilder, die noch ohne kleine Vorschau gespeichert sind (z.B. aus der
+  // alten Galerie uebernommen). Ohne Vorschau laedt jeder Besucher das
+  // Original in voller Groesse – genau das hat das Datenvolumen gesprengt.
+  function needsThumb(it) {
+    return it.type === 'image' && it.url && (!it.thumb || it.thumb === it.url) && /^https?:/.test(it.url) && !/\.svg(\?|$)/i.test(it.url);
+  }
+
+  async function generateMissingThumbs(a) {
+    const ziel = a.items.filter(needsThumb);
+    if (!ziel.length || mediaBusy) return;
+    mediaBusy = true;
+    let ok = 0, fehler = 0;
+    for (let i = 0; i < ziel.length; i++) {
+      const it = ziel[i];
+      setMediaStatus(`Erzeuge Vorschaubild ${i + 1} von ${ziel.length} …`, 'saving');
+      try {
+        const res = await fetch(it.url, { mode: 'cors' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const thumbBlob = await makeThumb(new File([blob], 'bild.jpg', { type: blob.type || 'image/jpeg' }));
+        // Nur speichern, wenn die Vorschau wirklich kleiner ist
+        if (thumbBlob.size < blob.size) {
+          it.thumb = await uploadBlob(thumbBlob, 'jpg', (it.name || 'bild') + '-vorschau');
+        } else {
+          it.thumb = it.url;
+        }
+        ok++;
+        // Zwischenspeichern alle 5 Bilder, damit bei Abbruch nichts verloren geht
+        if (ok % 5 === 0) await saveAlbum(a);
+      } catch (e) {
+        console.warn('Vorschau fehlgeschlagen:', it.url, e.message);
+        fehler++;
+      }
+    }
+    mediaBusy = false;
+    const saved = await saveAlbum(a);
+    renderMediaMain();
+    setMediaStatus(saved ? `✓ ${ok} Vorschaubilder erzeugt${fehler ? ` · ⚠ ${fehler} fehlgeschlagen` : ''}` : '⚠ Speichern fehlgeschlagen', saved && !fehler ? 'saved' : 'error');
   }
 
   function renderMediaGrid() {
