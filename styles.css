@@ -1441,3 +1441,61 @@ footer .footer-note {
   height: auto !important;
   aspect-ratio: 8 / 5;
 }
+
+/* ══════════════════════════════════════════════════════════
+   UNTERSEITEN: Presse & Downloads / Medienbibliothek
+══════════════════════════════════════════════════════════ */
+.media-page { background: var(--cream); color: var(--ink); }
+.media-header { position: relative; background: var(--ink); height: 96px; }
+.media-header .brand { width: 150px !important; height: 74px !important; flex: 0 0 150px; }
+.media-back {
+  margin-left: auto; font-size: 11px; font-weight: 700; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--cream); padding: 12px 18px; border: 1px solid #ffffff44;
+}
+.media-back:hover { border-color: var(--gold); color: var(--gold); }
+.media-main { padding: 70px 7vw 110px; max-width: 1400px; margin: 0 auto; }
+.media-intro { max-width: 860px; margin-bottom: 60px; }
+.media-intro h1 { font: 700 clamp(46px, 6vw, 90px)/.95 "Playfair Display", serif; letter-spacing: -.045em; margin: 0 0 26px; }
+.media-intro h1 em { color: var(--gold); }
+.media-intro p:not(.eyebrow) { font-size: 16px; line-height: 1.8; color: #536057; }
+.media-intro a { color: var(--ink); text-decoration: underline; }
+.media-album { margin-bottom: 70px; }
+.media-album__head { margin-bottom: 24px; border-bottom: 1px solid #142a2022; padding-bottom: 14px; }
+.media-album__head h2 { font: 700 clamp(26px, 3vw, 38px)/1.1 "Playfair Display", serif; margin: 0 0 8px; }
+.media-album__head p { margin: 0; font-size: 14px; line-height: 1.7; color: #59645d; max-width: 760px; }
+.media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
+.media-cell { display: flex; flex-direction: column; gap: 8px; }
+.media-card { display: block; width: 100%; background: #fff; border: 1px solid #142a2023; box-shadow: 0 12px 34px #10251a0a; overflow: hidden; }
+.media-card--image { appearance: none; padding: 0; cursor: zoom-in; text-align: left; position: relative; aspect-ratio: 4 / 3; }
+.media-card--image img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .5s; }
+.media-card--image:hover img { transform: scale(1.03); }
+.media-card__cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 14px; background: linear-gradient(0deg, #071710d9, transparent); color: #fff; font-size: 12px; }
+.media-dl {
+  display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--ink); color: var(--cream);
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; align-self: flex-start;
+}
+.media-dl:hover { background: #143427; }
+.media-card--doc { display: grid; grid-template-columns: 56px 1fr auto; gap: 14px; align-items: center; padding: 18px 20px; color: var(--ink); }
+.media-card--doc:hover { border-color: var(--gold); }
+.media-doc__icon { width: 56px; height: 56px; display: grid; place-items: center; background: var(--ink); color: var(--gold); font-weight: 700; font-size: 13px; letter-spacing: .08em; }
+.media-doc__body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.media-doc__body strong { font: 700 17px/1.25 "Playfair Display", serif; overflow-wrap: break-word; }
+.media-doc__body small { font-size: 12px; color: #59645d; }
+.media-doc__cta { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--red); white-space: nowrap; }
+.media-card--video { padding: 0; }
+.media-card--video iframe { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; }
+.media-card--video .media-doc__body { padding: 14px 18px 18px; }
+.media-empty { padding: 40px 0; color: #59645d; font-size: 15px; }
+.media-page footer .socials a { color: var(--gold); }
+@media (max-width: 900px) {
+  .media-header { height: 82px; padding: 0 20px; }
+  .media-main { padding: 46px 20px 80px; }
+  .media-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .media-card--doc { grid-template-columns: 46px 1fr; }
+  .media-doc__cta { grid-column: 2; }
+}
+
+/* Footer-Links zu den Unterseiten */
+footer .footer-links { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 22px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; }
+footer .footer-links a { color: var(--gold); }
+footer .footer-links a:hover { color: #fff; }

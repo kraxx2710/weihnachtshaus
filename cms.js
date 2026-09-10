@@ -336,46 +336,61 @@
 
   // ── Inhalte laden (für alle Besucher) ────────────────
   async function loadContent() {
-    try {
-      const rows = await apiFetch('/api/content');
-      rows.forEach(r => applyToDOM(r.id, r.wert));
-    } catch (e) {
-      console.warn('CMS: Inhalte konnten nicht geladen werden.', e.message);
-    }
+    const inhalte = apiFetch('/api/content')
+      .then(rows => rows.forEach(r => applyToDOM(r.id, r.wert)))
+      .catch(e => console.warn('CMS: Inhalte konnten nicht geladen werden.', e.message));
+    await Promise.all([inhalte, loadMedia()]);
   }
 
-  // Zusätzliche Galerie-Bilder (dynamische Liste, kein fixes data-cms-Element)
-  let galleryExtraItems = [];
+  // ── Medienverwaltung: Daten (Ordner mit Bildern/PDFs/Links) ──
+  // Quelle ist /api/media. Die Startseite zeigt alle sichtbaren Bilder
+  // der Ordner vom Typ "galerie" als zusaetzliche Reihen der Galerie.
+  let mediaAlbums = [];
+  const pageTextCache = {}; // Seitentexte presse_*/bibliothek_* aus /api/content
+
+  async function loadMedia() {
+    try {
+      const data = await apiFetch('/api/media');
+      mediaAlbums = Array.isArray(data.albums) ? data.albums : [];
+    } catch (e) {
+      console.warn('CMS: Medien konnten nicht geladen werden.', e.message);
+      mediaAlbums = [];
+    }
+    renderGalleryExtra();
+  }
 
   function renderGalleryExtra() {
     const container = document.getElementById('gallery-extra');
     if (!container) return;
     container.innerHTML = '';
-    galleryExtraItems.forEach(url => {
-      const btn = document.createElement('button');
-      btn.className = 'gallery-item';
-      btn.type = 'button';
-      btn.dataset.full = url;
-      const img = document.createElement('img');
-      img.loading = 'lazy';
-      img.alt = 'Weiteres Foto vom Weihnachtshaus';
-      // Nicht ladbare Bilder (z.B. gesperrter Speicher) verschwinden
-      // still aus dem Raster statt als Fehlersymbol zu erscheinen.
-      // Die URL bleibt in der Datenbank erhalten.
-      img.onerror = () => btn.remove();
-      img.src = url;
-      btn.appendChild(img);
-      container.appendChild(btn);
-    });
+    mediaAlbums
+      .filter(a => a.kind === 'galerie')
+      .flatMap(a => a.items)
+      .filter(it => it.type === 'image' && !it.hidden && it.url)
+      .forEach(it => {
+        const btn = document.createElement('button');
+        btn.className = 'gallery-item';
+        btn.type = 'button';
+        btn.dataset.full = it.url;
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.alt = it.title || 'Weiteres Foto vom Weihnachtshaus';
+        // Nicht ladbare Bilder verschwinden still aus dem Raster statt
+        // als Fehlersymbol zu erscheinen; der Eintrag bleibt erhalten.
+        img.onerror = () => btn.remove();
+        img.src = it.thumb || it.url;
+        btn.appendChild(img);
+        container.appendChild(btn);
+      });
   }
 
   function applyToDOM(fieldId, value) {
-    if (fieldId === 'gallery_extra') {
-      try { galleryExtraItems = value ? JSON.parse(value) : []; }
-      catch { galleryExtraItems = []; }
-      renderGalleryExtra();
-      return;
-    }
+    // Altes Feld: die Bilder liegen inzwischen in der Medienverwaltung.
+    if (fieldId === 'gallery_extra') return;
+    // Texte der Unterseiten (Presse/Bibliothek) haben auf der Startseite
+    // kein Element – nur fuer die Medienverwaltung merken.
+    if (/^(presse|bibliothek)_(title|text)$/.test(fieldId)) { pageTextCache[fieldId] = value || ''; return; }
     if (!value) return;
     const el = document.querySelector(`[data-cms="${fieldId}"]`);
     if (!el) return;
@@ -536,7 +551,22 @@
     });
   }
 
+  async function uploadBlob(blob, ext) {
+    const base64 = await blobToBase64(blob);
+    const { url } = await apiFetch('/api/upload', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiToken()}` },
+      body: JSON.stringify({ filename: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`, data: base64 }),
+    });
+    return url;
+  }
+
+  function isHeic(file) {
+    return /heic|heif/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
+  }
+
   async function uploadImage(file) {
+    if (isHeic(file)) throw new Error('HEIC-Fotos (iPhone) bitte zuerst als JPEG exportieren.');
     // SVGs sind bereits winzig und lassen sich nicht rastern -> unveraendert senden.
     let blob = file, ext = file.name.split('.').pop().toLowerCase();
     if (file.type !== 'image/svg+xml') {
@@ -544,13 +574,37 @@
       blob = resized.blob;
       ext = resized.ext;
     }
-    const base64 = await blobToBase64(blob);
-    const { url } = await apiFetch('/api/upload', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiToken()}` },
-      body: JSON.stringify({ filename: `${Date.now()}.${ext}`, data: base64 }),
+    return uploadBlob(blob, ext);
+  }
+
+  // Kleine Vorschau (max. 600 px) fuer Raster-Ansichten: Besucher laden
+  // so nur einen Bruchteil der Datenmenge, das Original bleibt fuer die
+  // Grossansicht und den Download erhalten.
+  async function makeThumb(file) {
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      el.onload = () => { URL.revokeObjectURL(objectUrl); resolve(el); };
+      el.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Bild konnte nicht gelesen werden')); };
+      el.src = objectUrl;
     });
-    return url;
+    const canvas = drawToCanvas(img, 600);
+    return canvasToBlob(canvas, 'image/jpeg', 0.8);
+  }
+
+  // Bild inkl. Vorschau hochladen -> { url, thumb, name }
+  async function uploadImageWithThumb(file) {
+    const url = await uploadImage(file);
+    let thumb = url;
+    if (file.type !== 'image/svg+xml') {
+      try { thumb = await uploadBlob(await makeThumb(file), 'jpg'); } catch { thumb = url; }
+    }
+    return { url, thumb, name: file.name };
+  }
+
+  async function uploadPdf(file) {
+    if (file.size > MAX_UPLOAD_BYTES) throw new Error(`PDF zu gross (max. ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB)`);
+    return uploadBlob(file, 'pdf');
   }
 
   // ── Toolbar-Status ────────────────────────────────────
@@ -572,7 +626,7 @@
   function loadAdminAssets() {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = 'cms.css';
+    link.href = 'cms.css?v=4';
     document.head.appendChild(link);
     if (localStorage.getItem(TOKEN_KEY)) {
       startAdminMode();
@@ -662,9 +716,11 @@
       </div>
       <div id="cms-status" class="cms-status">Admin-Modus aktiv</div>
       <span class="cms-hint">✏ Bereich anklicken zum Bearbeiten</span>
+      <button id="cms-media-btn" type="button">🗂 Medien &amp; Ordner</button>
       <button id="cms-logout">Abmelden</button>
     `;
     document.body.prepend(bar);
+    document.getElementById('cms-media-btn').addEventListener('click', openMediaManager);
     document.getElementById('cms-logout').addEventListener('click', async () => {
       await flushPendingSaves();
       localStorage.removeItem(TOKEN_KEY);
@@ -847,104 +903,484 @@
     panel.classList.add('open');
   }
 
-  // ── Galerie: beliebig viele zusätzliche Bilder ────────
+  // ── Galerie-Bereich: Verweis auf die Medienverwaltung ─
   function buildGalleryExtraEditor(body) {
     const wrap = document.createElement('div');
     wrap.className = 'cms-field-group';
-
-    const lbl = document.createElement('label');
-    lbl.textContent = 'Weitere Bilder (zusätzliche Reihen)';
-    wrap.appendChild(lbl);
-
-    const grid = document.createElement('div');
-    grid.className = 'cms-gallery-extra-grid';
-    wrap.appendChild(grid);
-
-    function renderThumbs() {
-      grid.innerHTML = '';
-      galleryExtraItems.forEach((url, i) => {
-        const fid = `file-gallery-extra-replace-${i}`;
-        const thumb = document.createElement('div');
-        thumb.className = 'cms-gallery-extra-thumb';
-        thumb.innerHTML = `
-          <img src="${url}" alt="">
-          <label class="cms-gallery-extra-replace" for="${fid}" title="Bild ersetzen">📁</label>
-          <input class="cms-gallery-add-input" type="file" id="${fid}" accept="image/*">
-        `;
-
-        const del = document.createElement('button');
-        del.type = 'button';
-        del.className = 'cms-gallery-extra-delete';
-        del.textContent = '✕';
-        del.title = 'Entfernen';
-        del.addEventListener('click', async () => {
-          galleryExtraItems.splice(i, 1);
-          renderGalleryExtra();
-          renderThumbs();
-          await saveField('gallery_extra', JSON.stringify(galleryExtraItems));
-        });
-        thumb.appendChild(del);
-
-        thumb.querySelector(`#${fid}`).addEventListener('change', async function () {
-          const file = this.files[0];
-          if (!file) return;
-          setPanelStatus('Bild wird ersetzt …', 'saving');
-          try {
-            const url2 = await uploadImage(file);
-            galleryExtraItems[i] = url2;
-            renderGalleryExtra();
-            renderThumbs();
-            await saveField('gallery_extra', JSON.stringify(galleryExtraItems));
-            setPanelStatus('✓ Bild ersetzt', 'saved');
-          } catch {
-            setPanelStatus('⚠ Upload fehlgeschlagen', 'error');
-          }
-        });
-
-        grid.appendChild(thumb);
-      });
-    }
-    renderThumbs();
-
-    const fid = 'file-gallery-extra-add';
-    const addBtn = document.createElement('label');
-    addBtn.className = 'cms-gallery-add-btn';
-    addBtn.setAttribute('for', fid);
-    addBtn.textContent = '➕ Bilder hinzufügen';
-
-    const input = document.createElement('input');
-    input.className = 'cms-gallery-add-input';
-    input.type = 'file';
-    input.id = fid;
-    input.accept = 'image/*';
-    input.multiple = true;
-
-    input.addEventListener('change', async function () {
-      const files = Array.from(this.files || []);
-      if (!files.length) return;
-      setPanelStatus(`Lade ${files.length} Bild(er) hoch …`, 'saving');
-      try {
-        for (const file of files) {
-          const url = await uploadImage(file);
-          galleryExtraItems.push(url);
-        }
-        renderGalleryExtra();
-        renderThumbs();
-        await saveField('gallery_extra', JSON.stringify(galleryExtraItems));
-        setPanelStatus('✓ Bilder hinzugefügt', 'saved');
-      } catch {
-        setPanelStatus('⚠ Upload fehlgeschlagen', 'error');
-      }
-      input.value = '';
-    });
-
-    wrap.appendChild(addBtn);
-    wrap.appendChild(input);
+    const n = mediaAlbums.filter(a => a.kind === 'galerie').flatMap(a => a.items).filter(i => !i.hidden).length;
+    wrap.innerHTML = `
+      <label>Weitere Bilder (zusätzliche Reihen)</label>
+      <p style="font-size:13px;line-height:1.6;color:#ffffffaa;margin:0 0 12px">
+        Derzeit ${n} zusätzliche Bilder sichtbar. Hinzufügen, Ausblenden, Löschen und Sortieren
+        erledigst du in der Medienverwaltung – dort auch für Presse und Bibliothek.</p>
+    `;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cms-gallery-add-btn';
+    btn.textContent = '🗂 Medienverwaltung öffnen';
+    btn.addEventListener('click', () => openMediaManager('galerie'));
+    wrap.appendChild(btn);
     body.appendChild(wrap);
-
     const divider = document.createElement('div');
     divider.className = 'cms-divider';
     body.appendChild(divider);
+  }
+
+  // ══════════════════════════════════════════════════════
+  //  MEDIENVERWALTUNG
+  //  Ordner ("Alben") in drei Bereichen: Galerie (Startseite),
+  //  Presse (presse.html) und Bibliothek (bibliothek.html).
+  // ══════════════════════════════════════════════════════
+  const MEDIA_KINDS = [
+    { key: 'galerie',    label: 'Galerie – Startseite',   hint: 'Bilder erscheinen unten in der Galerie der Startseite.' },
+    { key: 'presse',     label: 'Presse & Downloads',     hint: 'Bilder in Originalgröße zum Download für Journalisten (presse.html).' },
+    { key: 'bibliothek', label: 'Medienbibliothek',       hint: 'Zeitungsartikel (Bilder/PDF), TV-Beiträge und Videos (bibliothek.html).' },
+  ];
+  const PAGE_TEXT_FIELDS = [
+    { id: 'presse_title',     label: 'Presse – Überschrift' },
+    { id: 'presse_text',      label: 'Presse – Einleitungstext', multi: true },
+    { id: 'bibliothek_title', label: 'Bibliothek – Überschrift' },
+    { id: 'bibliothek_text',  label: 'Bibliothek – Einleitungstext', multi: true },
+  ];
+
+  let mediaCurrent = null;            // aktuell geöffneter Ordner (Objekt aus mediaAlbums)
+  const mediaSelected = new Set();    // markierte Element-IDs
+  let mediaBusy = false;
+
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function newId() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-3); }
+  function slug(t) {
+    return t.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'ordner';
+  }
+
+  function setMediaStatus(text, cls) {
+    const el = document.getElementById('cms-media-status');
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = cls || '';
+  }
+
+  async function mediaPost(payload) {
+    return apiFetch('/api/media', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiToken()}` },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Speichert einen Ordner auf dem Server; Rueckgabe true/false.
+  async function saveAlbum(album, meldung) {
+    setMediaStatus('Speichert …', 'saving');
+    try {
+      const { album: saved } = await mediaPost({ op: 'saveAlbum', album });
+      // Server-bereinigte Version uebernehmen, damit Anzeige und
+      // Datenbank garantiert identisch sind.
+      const i = mediaAlbums.findIndex(a => a.id === saved.id);
+      if (i === -1) mediaAlbums.push(saved); else mediaAlbums[i] = saved;
+      if (mediaCurrent && mediaCurrent.id === saved.id) mediaCurrent = saved;
+      renderGalleryExtra();
+      setMediaStatus(meldung || '✓ Gespeichert', 'saved');
+      return true;
+    } catch (e) {
+      console.error(e);
+      setMediaStatus('⚠ Speichern fehlgeschlagen – bitte erneut versuchen', 'error');
+      return false;
+    }
+  }
+
+  function injectMediaManager() {
+    if (document.getElementById('cms-media')) return;
+    const el = document.createElement('div');
+    el.id = 'cms-media';
+    el.innerHTML = `
+      <header>
+        <h2>🗂 Medien &amp; Ordner</h2>
+        <div class="cms-media-links">
+          <a href="presse.html" target="_blank" rel="noopener">Presse-Seite ↗</a>
+          <a href="bibliothek.html" target="_blank" rel="noopener">Bibliothek ↗</a>
+        </div>
+        <button id="cms-media-close" type="button" title="Schließen">✕</button>
+      </header>
+      <div id="cms-media-body">
+        <aside id="cms-media-aside"></aside>
+        <section id="cms-media-main">
+          <div id="cms-media-tools"></div>
+          <div id="cms-media-status"></div>
+          <div id="cms-media-grid"></div>
+        </section>
+      </div>
+    `;
+    document.body.appendChild(el);
+    document.getElementById('cms-media-close').addEventListener('click', closeMediaManager);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && el.classList.contains('open') && !document.getElementById('cms-mform')?.classList.contains('open')) closeMediaManager();
+    });
+
+    const form = document.createElement('div');
+    form.id = 'cms-mform';
+    form.innerHTML = `
+      <form>
+        <h3 id="cms-mform-title">Eintrag bearbeiten</h3>
+        <label>Titel</label><input name="title" maxlength="160" autocomplete="off">
+        <label>Quelle / Medium (z.B. „Kronen Zeitung", „ORF Burgenland")</label><input name="source" maxlength="120" autocomplete="off">
+        <label>Datum</label><input name="date" type="date">
+        <label id="cms-mform-linklabel">Link (Artikel-URL oder YouTube-Video)</label><input name="link" type="url" placeholder="https://…">
+        <div class="row">
+          <button type="button" class="cms-mbtn" data-act="cancel">Abbrechen</button>
+          <button type="submit" class="cms-mbtn primary">Übernehmen</button>
+        </div>
+      </form>
+    `;
+    document.body.appendChild(form);
+    form.querySelector('[data-act="cancel"]').addEventListener('click', () => form.classList.remove('open'));
+    form.addEventListener('click', e => { if (e.target === form) form.classList.remove('open'); });
+  }
+
+  // Dialog fuer Titel/Quelle/Datum/Link. Liefert Objekt oder null.
+  function mediaForm(titel, werte, mitLink) {
+    const box = document.getElementById('cms-mform');
+    const f = box.querySelector('form');
+    box.querySelector('#cms-mform-title').textContent = titel;
+    f.title.value = werte.title || '';
+    f.source.value = werte.source || '';
+    f.date.value = werte.date || '';
+    f.link.value = werte.link || '';
+    const linkVisible = !!mitLink;
+    f.link.hidden = !linkVisible;
+    box.querySelector('#cms-mform-linklabel').hidden = !linkVisible;
+    f.link.required = linkVisible;
+    box.classList.add('open');
+    setTimeout(() => f.title.focus(), 30);
+    return new Promise(resolve => {
+      const done = (val) => { box.classList.remove('open'); f.onsubmit = null; cancel.onclick = null; resolve(val); };
+      const cancel = f.querySelector('[data-act="cancel"]');
+      cancel.onclick = () => done(null);
+      f.onsubmit = (e) => {
+        e.preventDefault();
+        done({ title: f.title.value.trim(), source: f.source.value.trim(), date: f.date.value, link: f.link.value.trim() });
+      };
+    });
+  }
+
+  async function openMediaManager(kind) {
+    injectMediaManager();
+    await flushPendingSaves();
+    document.getElementById('cms-panel')?.classList.remove('open');
+    setMediaStatus('Lade …', 'saving');
+    await loadMedia();
+    const wunsch = typeof kind === 'string' ? kind : null;
+    if (!mediaCurrent || !mediaAlbums.some(a => a.id === mediaCurrent.id)) {
+      mediaCurrent = mediaAlbums.find(a => !wunsch || a.kind === wunsch) || mediaAlbums[0] || null;
+    } else if (wunsch && mediaCurrent.kind !== wunsch) {
+      mediaCurrent = mediaAlbums.find(a => a.kind === wunsch) || mediaCurrent;
+    }
+    mediaSelected.clear();
+    document.getElementById('cms-media').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    renderMediaAside();
+    renderMediaMain();
+    setMediaStatus('');
+  }
+
+  function closeMediaManager() {
+    if (mediaBusy && !confirm('Ein Upload läuft noch. Trotzdem schließen?')) return;
+    document.getElementById('cms-media')?.classList.remove('open');
+    document.body.style.overflow = '';
+    renderGalleryExtra();
+  }
+
+  // ── Linke Spalte: Ordnerliste + Seitentexte ───────────
+  function renderMediaAside() {
+    const aside = document.getElementById('cms-media-aside');
+    aside.innerHTML = '';
+    MEDIA_KINDS.forEach(k => {
+      const g = document.createElement('div');
+      g.className = 'cms-media-group';
+      g.innerHTML = `<h3 title="${esc(k.hint)}">${esc(k.label)}</h3>`;
+      mediaAlbums.filter(a => a.kind === k.key).forEach(a => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cms-media-album' + (mediaCurrent && mediaCurrent.id === a.id ? ' active' : '');
+        const sichtbar = a.items.filter(i => !i.hidden).length;
+        b.innerHTML = `📁 <span>${esc(a.title)}</span><small>${sichtbar}${a.items.length !== sichtbar ? ` (+${a.items.length - sichtbar} versteckt)` : ''}</small>`;
+        b.addEventListener('click', () => { mediaCurrent = a; mediaSelected.clear(); renderMediaAside(); renderMediaMain(); });
+        g.appendChild(b);
+      });
+      const neu = document.createElement('button');
+      neu.type = 'button';
+      neu.className = 'cms-media-newfolder';
+      neu.textContent = '+ Neuer Ordner';
+      neu.addEventListener('click', async () => {
+        const title = prompt('Name des neuen Ordners:');
+        if (!title || !title.trim()) return;
+        let id = slug(title);
+        while (mediaAlbums.some(a => a.id === id)) id = (id + '-2').slice(0, 40);
+        const album = { id, kind: k.key, title: title.trim(), text: '', items: [] };
+        if (await saveAlbum(album, '✓ Ordner angelegt')) {
+          mediaCurrent = mediaAlbums.find(a => a.id === id);
+          mediaSelected.clear();
+          renderMediaAside(); renderMediaMain();
+        }
+      });
+      g.appendChild(neu);
+      aside.appendChild(g);
+    });
+
+    // Seitentexte der Unterseiten
+    const t = document.createElement('div');
+    t.id = 'cms-media-texts';
+    t.innerHTML = '<h3 style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#e6b554;margin:0 0 4px">Seitentexte</h3>';
+    PAGE_TEXT_FIELDS.forEach(f => {
+      const lbl = document.createElement('label');
+      lbl.textContent = f.label;
+      const inp = document.createElement(f.multi ? 'textarea' : 'input');
+      if (f.multi) inp.rows = 4;
+      inp.placeholder = 'Standardtext der Seite wird verwendet';
+      inp.value = pageTextCache[f.id] || '';
+      inp.addEventListener('change', async () => {
+        pageTextCache[f.id] = inp.value;
+        const ok = await saveField(f.id, inp.value);
+        setMediaStatus(ok ? '✓ Text gespeichert' : '⚠ Text konnte nicht gespeichert werden', ok ? 'saved' : 'error');
+      });
+      t.appendChild(lbl); t.appendChild(inp);
+    });
+    aside.appendChild(t);
+  }
+
+  // ── Rechte Seite: Werkzeuge + Raster ──────────────────
+  function renderMediaMain() {
+    const tools = document.getElementById('cms-media-tools');
+    const grid = document.getElementById('cms-media-grid');
+    const a = mediaCurrent;
+    if (!a) {
+      tools.innerHTML = '<span class="cms-media-title">Kein Ordner vorhanden</span>';
+      grid.innerHTML = '<div class="cms-media-empty">Lege links einen Ordner an.</div>';
+      return;
+    }
+    const kind = MEDIA_KINDS.find(k => k.key === a.kind) || MEDIA_KINDS[0];
+    const sel = mediaSelected.size;
+    const andere = mediaAlbums.filter(x => x.id !== a.id);
+
+    tools.innerHTML = `
+      <span class="cms-media-title">${esc(a.title)}</span>
+      <button class="cms-mbtn" data-act="rename" title="Ordner umbenennen / Beschreibung">✎ Ordner</button>
+      <button class="cms-mbtn danger" data-act="delfolder" title="Ordner samt Inhalt löschen">🗑 Ordner</button>
+      <span class="spacer"></span>
+      <label class="cms-mbtn primary" for="cms-media-upload">＋ Bilder${a.kind === 'bibliothek' ? ' / PDF' : ''} hochladen</label>
+      <input id="cms-media-upload" type="file" multiple accept="${a.kind === 'bibliothek' ? 'image/*,.pdf,application/pdf' : 'image/*'}" style="display:none">
+      ${a.kind === 'bibliothek' ? '<button class="cms-mbtn" data-act="addlink">🔗 Link / Video</button>' : ''}
+      <button class="cms-mbtn" data-act="selall">${sel && sel === a.items.length ? 'Auswahl aufheben' : 'Alle auswählen'}</button>
+      <button class="cms-mbtn" data-act="hide" ${sel ? '' : 'disabled'}>👁 Aus-/Einblenden (${sel})</button>
+      <label class="cms-mbtn" ${sel && andere.length ? '' : 'style="opacity:.4"'}>➜ Verschieben nach
+        <select data-act="move" ${sel && andere.length ? '' : 'disabled'}>
+          <option value="">…</option>
+          ${andere.map(x => `<option value="${esc(x.id)}">${esc(x.title)} (${esc((MEDIA_KINDS.find(k => k.key === x.kind) || {}).label || x.kind)})</option>`).join('')}
+        </select>
+      </label>
+      <button class="cms-mbtn danger" data-act="del" ${sel ? '' : 'disabled'}>🗑 Löschen (${sel})</button>
+    `;
+    tools.querySelector('.cms-media-title').title = kind.hint;
+
+    tools.querySelector('[data-act="rename"]').onclick = async () => {
+      const title = prompt('Ordnername:', a.title);
+      if (title === null) return;
+      const text = prompt('Kurzbeschreibung (optional, erscheint unter der Überschrift):', a.text || '');
+      if (text === null) return;
+      await saveAlbum({ ...a, title: title.trim() || a.title, text: text.trim() }, '✓ Ordner aktualisiert');
+      renderMediaAside(); renderMediaMain();
+    };
+    tools.querySelector('[data-act="delfolder"]').onclick = async () => {
+      if (!confirm(`Ordner „${a.title}" mit ${a.items.length} Einträgen endgültig löschen?`)) return;
+      setMediaStatus('Lösche Ordner …', 'saving');
+      try {
+        await mediaPost({ op: 'deleteAlbum', id: a.id });
+        mediaAlbums = mediaAlbums.filter(x => x.id !== a.id);
+        mediaCurrent = mediaAlbums.find(x => x.kind === a.kind) || mediaAlbums[0] || null;
+        mediaSelected.clear();
+        renderGalleryExtra(); renderMediaAside(); renderMediaMain();
+        setMediaStatus('✓ Ordner gelöscht', 'saved');
+      } catch { setMediaStatus('⚠ Ordner konnte nicht gelöscht werden', 'error'); }
+    };
+    tools.querySelector('#cms-media-upload').onchange = function () { mediaUpload(Array.from(this.files || [])); this.value = ''; };
+    const addlink = tools.querySelector('[data-act="addlink"]');
+    if (addlink) addlink.onclick = async () => {
+      const v = await mediaForm('Link oder Video hinzufügen', {}, true);
+      if (!v || !v.link) return;
+      a.items.push({ id: newId(), type: 'link', url: '', thumb: '', link: v.link, title: v.title, source: v.source, date: v.date, hidden: false });
+      await saveAlbum(a, '✓ Link hinzugefügt');
+      renderMediaAside(); renderMediaMain();
+    };
+    tools.querySelector('[data-act="selall"]').onclick = () => {
+      if (mediaSelected.size === a.items.length) mediaSelected.clear();
+      else a.items.forEach(i => mediaSelected.add(i.id));
+      renderMediaMain();
+    };
+    tools.querySelector('[data-act="hide"]').onclick = async () => {
+      const ziel = a.items.filter(i => mediaSelected.has(i.id));
+      const alleVersteckt = ziel.every(i => i.hidden);
+      ziel.forEach(i => { i.hidden = !alleVersteckt; });
+      await saveAlbum(a, alleVersteckt ? '✓ Wieder eingeblendet' : '✓ Ausgeblendet (bleibt gespeichert)');
+      renderMediaAside(); renderMediaMain();
+    };
+    tools.querySelector('[data-act="move"]').onchange = async function () {
+      const zielId = this.value;
+      const ziel = mediaAlbums.find(x => x.id === zielId);
+      if (!ziel) return;
+      const bewegt = a.items.filter(i => mediaSelected.has(i.id));
+      a.items = a.items.filter(i => !mediaSelected.has(i.id));
+      ziel.items.push(...bewegt);
+      const ok1 = await saveAlbum(ziel);
+      const ok2 = ok1 && await saveAlbum(a, `✓ ${bewegt.length} Einträge nach „${ziel.title}" verschoben`);
+      if (!ok2) await loadMedia();
+      mediaSelected.clear();
+      renderMediaAside(); renderMediaMain();
+    };
+    tools.querySelector('[data-act="del"]').onclick = async () => {
+      const n = mediaSelected.size;
+      if (!confirm(`${n} Einträge endgültig löschen? (Tipp: „Ausblenden" behält die Dateien.)`)) return;
+      const weg = a.items.filter(i => mediaSelected.has(i.id));
+      a.items = a.items.filter(i => !mediaSelected.has(i.id));
+      const ok = await saveAlbum(a, `✓ ${n} Einträge gelöscht`);
+      if (ok) {
+        const urls = weg.flatMap(i => [i.url, i.thumb]).filter(Boolean);
+        mediaPost({ op: 'deleteBlobs', urls }).catch(() => {});
+      } else {
+        await loadMedia();
+      }
+      mediaSelected.clear();
+      renderMediaAside(); renderMediaMain();
+    };
+
+    renderMediaGrid();
+  }
+
+  function renderMediaGrid() {
+    const grid = document.getElementById('cms-media-grid');
+    const a = mediaCurrent;
+    grid.innerHTML = '';
+    if (!a.items.length) {
+      grid.innerHTML = `<div class="cms-media-empty">Dieser Ordner ist noch leer.<br>Über „＋ hochladen" kannst du mehrere Dateien auf einmal auswählen.</div>`;
+      return;
+    }
+    a.items.forEach((it, idx) => {
+      const cell = document.createElement('div');
+      cell.className = 'cms-mitem' + (mediaSelected.has(it.id) ? ' selected' : '') + (it.hidden ? ' hidden' : '');
+      cell.draggable = true;
+      cell.dataset.idx = idx;
+      const meta = [it.source, it.date].filter(Boolean).join(' · ');
+      const inhalt = it.type === 'image'
+        ? `<img src="${esc(it.thumb || it.url)}" alt="" loading="lazy" decoding="async">`
+        : `<div class="cms-mdoc"><b>${it.type === 'pdf' ? 'PDF' : 'LINK'}</b><span>${esc(it.title || it.name || it.link)}</span>${meta ? `<span style="color:#ffffff88">${esc(meta)}</span>` : ''}</div>`;
+      cell.innerHTML = `
+        <input type="checkbox" ${mediaSelected.has(it.id) ? 'checked' : ''} title="Auswählen">
+        ${it.hidden ? '<span class="cms-mbadge">versteckt</span>' : (it.type === 'image' && it.title ? `<span class="cms-mbadge" style="max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.title)}</span>` : '')}
+        ${inhalt}
+        <div class="cms-mactions">
+          <button type="button" data-act="edit" title="Titel, Quelle, Datum">✎</button>
+          <button type="button" data-act="hide" title="${it.hidden ? 'Einblenden' : 'Ausblenden'}">${it.hidden ? '👁' : '🙈'}</button>
+          <button type="button" data-act="left" title="Nach vorne">◀</button>
+          <button type="button" data-act="right" title="Nach hinten">▶</button>
+          <button type="button" data-act="open" title="Original öffnen">↗</button>
+        </div>
+      `;
+      // Bild-Fehler sichtbar machen statt leerer Kachel
+      const img = cell.querySelector('img');
+      if (img) img.onerror = () => { img.replaceWith(Object.assign(document.createElement('div'), { className: 'cms-mdoc', innerHTML: '<b>⚠</b><span>Bild nicht ladbar</span>' })); };
+
+      cell.querySelector('input').addEventListener('change', e => {
+        if (e.target.checked) mediaSelected.add(it.id); else mediaSelected.delete(it.id);
+        renderMediaMain();
+      });
+      cell.addEventListener('click', e => {
+        if (e.target.closest('button') || e.target.matches('input')) return;
+        if (mediaSelected.has(it.id)) mediaSelected.delete(it.id); else mediaSelected.add(it.id);
+        renderMediaMain();
+      });
+      cell.querySelector('[data-act="edit"]').onclick = async () => {
+        const v = await mediaForm(it.type === 'link' ? 'Link bearbeiten' : 'Beschreibung bearbeiten', it, it.type === 'link');
+        if (!v) return;
+        Object.assign(it, { title: v.title, source: v.source, date: v.date }, it.type === 'link' ? { link: v.link || it.link } : {});
+        await saveAlbum(a, '✓ Beschreibung gespeichert');
+        renderMediaGrid();
+      };
+      cell.querySelector('[data-act="hide"]').onclick = async () => {
+        it.hidden = !it.hidden;
+        await saveAlbum(a, it.hidden ? '✓ Ausgeblendet' : '✓ Eingeblendet');
+        renderMediaAside(); renderMediaGrid();
+      };
+      cell.querySelector('[data-act="left"]').onclick = () => moveItem(idx, idx - 1);
+      cell.querySelector('[data-act="right"]').onclick = () => moveItem(idx, idx + 1);
+      cell.querySelector('[data-act="open"]').onclick = () => window.open(it.type === 'link' ? it.link : it.url, '_blank', 'noopener');
+
+      // Drag & Drop zum Sortieren
+      cell.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', String(idx)); cell.style.opacity = '.5'; });
+      cell.addEventListener('dragend', () => { cell.style.opacity = ''; });
+      cell.addEventListener('dragover', e => { e.preventDefault(); cell.style.outline = '2px dashed #e6b554'; });
+      cell.addEventListener('dragleave', () => { cell.style.outline = ''; });
+      cell.addEventListener('drop', e => {
+        e.preventDefault(); cell.style.outline = '';
+        const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        if (!Number.isNaN(from) && from !== idx) moveItem(from, idx);
+      });
+      grid.appendChild(cell);
+    });
+  }
+
+  async function moveItem(from, to) {
+    const a = mediaCurrent;
+    if (to < 0 || to >= a.items.length || from === to) return;
+    const [it] = a.items.splice(from, 1);
+    a.items.splice(to, 0, it);
+    renderMediaGrid();
+    await saveAlbum(a, '✓ Reihenfolge gespeichert');
+  }
+
+  // Mehrere Dateien nacheinander hochladen. Jede Datei wird einzeln
+  // behandelt und SOFORT gespeichert – ein Fehler bei Bild 37 kostet
+  // nicht die 36 davor, und ein Browser-Absturz auch nicht.
+  async function mediaUpload(files) {
+    const a = mediaCurrent;
+    if (!a || !files.length) return;
+    mediaBusy = true;
+    let ok = 0; const fehler = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setMediaStatus(`Lade ${i + 1} von ${files.length} hoch: ${file.name} …`, 'saving');
+      try {
+        let item;
+        if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+          if (a.kind !== 'bibliothek') throw new Error('PDF nur in der Bibliothek möglich');
+          const url = await uploadPdf(file);
+          item = { id: newId(), type: 'pdf', url, thumb: '', link: '', name: file.name, title: file.name.replace(/\.pdf$/i, ''), source: '', date: '', hidden: false };
+        } else if (file.type.startsWith('image/') || isHeic(file)) {
+          const r = await uploadImageWithThumb(file);
+          item = { id: newId(), type: 'image', url: r.url, thumb: r.thumb, link: '', name: file.name, title: '', source: '', date: '', hidden: false };
+        } else {
+          throw new Error('Dateityp nicht unterstützt');
+        }
+        a.items.push(item);
+        const saved = await saveAlbum(a);
+        if (!saved) throw new Error('Speichern fehlgeschlagen');
+        ok++;
+        renderMediaGrid();
+        const g = document.getElementById('cms-media-grid'); g.scrollTop = g.scrollHeight;
+      } catch (e) {
+        fehler.push(`${file.name}: ${e.message}`);
+        // Falls das Speichern scheiterte, den Eintrag lokal nicht behalten
+        if (a.items.length && a.items[a.items.length - 1].name === file.name && /Speichern/.test(e.message)) a.items.pop();
+      }
+    }
+    mediaBusy = false;
+    renderMediaAside(); renderMediaMain();
+    if (fehler.length) {
+      setMediaStatus(`✓ ${ok} hochgeladen · ⚠ ${fehler.length} fehlgeschlagen`, 'error');
+      alert('Nicht hochgeladen:\n\n' + fehler.join('\n'));
+    } else {
+      setMediaStatus(`✓ ${ok} Datei(en) hochgeladen und gespeichert`, 'saved');
+    }
   }
 
   async function closePanel() {
