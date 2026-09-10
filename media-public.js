@@ -111,22 +111,7 @@
     }
   }
 
-  // Lightbox (gleiches Verhalten wie auf der Startseite)
-  const lb = document.querySelector('.lightbox');
-  if (lb) {
-    const img = lb.querySelector('img');
-    const close = () => { lb.classList.remove('open'); lb.setAttribute('aria-hidden', 'true'); document.body.classList.remove('lightbox-open'); };
-    document.addEventListener('click', e => {
-      const item = e.target.closest('.gallery-item');
-      if (!item) return;
-      img.src = item.dataset.full;
-      img.alt = (item.querySelector('img') || {}).alt || '';
-      lb.classList.add('open'); lb.setAttribute('aria-hidden', 'false'); document.body.classList.add('lightbox-open');
-    });
-    lb.querySelector('.lightbox-close').addEventListener('click', close);
-    lb.addEventListener('click', e => { if (e.target === lb) close(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
-  }
+  // Grossansicht: lightbox.js
 
   load();
 })();

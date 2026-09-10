@@ -21,37 +21,7 @@ const observer = new IntersectionObserver((entries) => {
 
 document.querySelectorAll(".reveal").forEach((element) => observer.observe(element));
 
-const lightbox = document.querySelector(".lightbox");
-const lightboxImage = lightbox.querySelector("img");
-const lightboxClose = lightbox.querySelector(".lightbox-close");
-
-const closeLightbox = () => {
-  lightbox.classList.remove("open");
-  lightbox.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("lightbox-open");
-};
-
-// Event-Delegation: funktioniert auch fuer Bilder, die das CMS
-// nachtraeglich dynamisch in die Galerie einfuegt.
-document.addEventListener("click", (event) => {
-  const item = event.target.closest(".gallery-item");
-  if (!item) return;
-  const thumbnail = item.querySelector("img");
-  lightboxImage.src = item.dataset.full;
-  lightboxImage.alt = thumbnail ? thumbnail.alt : "";
-  lightbox.classList.add("open");
-  lightbox.setAttribute("aria-hidden", "false");
-  document.body.classList.add("lightbox-open");
-  lightboxClose.focus();
-});
-
-lightboxClose.addEventListener("click", closeLightbox);
-lightbox.addEventListener("click", (event) => {
-  if (event.target === lightbox) closeLightbox();
-});
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && lightbox.classList.contains("open")) closeLightbox();
-});
+// Grossansicht: siehe lightbox.js (gemeinsam fuer alle Seiten)
 
 const normalizeSponsorLogo = (image) => {
   const canvas = document.createElement("canvas");
