@@ -636,7 +636,7 @@
   function loadAdminAssets() {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = 'cms.css?v=4';
+    link.href = 'cms.css?v=5';
     document.head.appendChild(link);
     if (localStorage.getItem(TOKEN_KEY)) {
       startAdminMode();
@@ -1161,48 +1161,75 @@
   }
 
   // ── Rechte Seite: Werkzeuge + Raster ──────────────────
+  // Die Werkzeugleiste und das Raster werden getrennt aufgebaut: eine
+  // Auswahl aendert nur Klassen und Zaehler, das Raster bleibt stehen.
+  const TILE_KEY = 'wh_cms_tile';
+  let lastClickedIdx = -1;
+
+  function tileSize() { return localStorage.getItem(TILE_KEY) || 'm'; }
+
   function renderMediaMain() {
+    renderMediaTools();
+    renderMediaGrid();
+  }
+
+  function renderMediaTools() {
     const tools = document.getElementById('cms-media-tools');
-    const grid = document.getElementById('cms-media-grid');
     const a = mediaCurrent;
     if (!a) {
       tools.innerHTML = '<span class="cms-media-title">Kein Ordner vorhanden</span>';
-      grid.innerHTML = '<div class="cms-media-empty">Lege links einen Ordner an.</div>';
+      document.getElementById('cms-media-grid').innerHTML = '<div class="cms-media-empty">Lege links einen Ordner an.</div>';
       return;
     }
     const kind = MEDIA_KINDS.find(k => k.key === a.kind) || MEDIA_KINDS[0];
     const sel = mediaSelected.size;
     const andere = mediaAlbums.filter(x => x.id !== a.id);
     const ohneThumb = a.items.filter(needsThumb);
+    const size = tileSize();
 
     tools.innerHTML = `
-      <span class="cms-media-title">${esc(a.title)}</span>
-      <button class="cms-mbtn" data-act="rename" title="Ordner umbenennen / Beschreibung">✎ Ordner</button>
-      <button class="cms-mbtn danger" data-act="delfolder" title="Ordner samt Inhalt löschen">🗑 Ordner</button>
-      <span class="spacer"></span>
-      <label class="cms-mbtn primary" for="cms-media-upload">＋ Bilder${a.kind === 'bibliothek' ? ' / PDF' : ''} hochladen</label>
-      <input id="cms-media-upload" type="file" multiple accept="${a.kind === 'bibliothek' ? 'image/*,.pdf,application/pdf' : 'image/*'}" style="display:none">
-      ${a.kind === 'bibliothek' ? '<button class="cms-mbtn" data-act="addlink">🔗 Link / Video</button>' : ''}
-      <button class="cms-mbtn" data-act="selall">${sel && sel === a.items.length ? 'Auswahl aufheben' : 'Alle auswählen'}</button>
-      <button class="cms-mbtn" data-act="hide" ${sel ? '' : 'disabled'}>👁 Aus-/Einblenden (${sel})</button>
-      <label class="cms-mbtn" ${sel && andere.length ? '' : 'style="opacity:.4"'}>➜ Verschieben nach
-        <select data-act="move" ${sel && andere.length ? '' : 'disabled'}>
-          <option value="">…</option>
-          ${andere.map(x => `<option value="${esc(x.id)}">${esc(x.title)} (${esc((MEDIA_KINDS.find(k => k.key === x.kind) || {}).label || x.kind)})</option>`).join('')}
-        </select>
-      </label>
-      <button class="cms-mbtn danger" data-act="del" ${sel ? '' : 'disabled'}>🗑 Löschen (${sel})</button>
-      ${ohneThumb.length ? `<button class="cms-mbtn" data-act="thumbs" title="Erzeugt kleine Vorschaubilder – die Seite lädt dann deutlich schneller und verbraucht weniger Datenvolumen">🖼 Vorschaubilder erzeugen (${ohneThumb.length})</button>` : ''}
+      <div class="cms-media-row">
+        <span class="cms-media-title" title="${esc(kind.hint)}">${esc(a.title)} <small>${a.items.length}</small></span>
+        <button class="cms-mbtn" data-act="rename" title="Ordner umbenennen / Beschreibung">✎ Umbenennen</button>
+        <button class="cms-mbtn danger" data-act="delfolder" title="Ordner samt Inhalt löschen">🗑 Ordner löschen</button>
+        <span class="spacer"></span>
+        ${ohneThumb.length ? `<button class="cms-mbtn" data-act="thumbs" title="Erzeugt kleine Vorschaubilder – die Seite lädt dann deutlich schneller">🖼 Vorschaubilder (${ohneThumb.length})</button>` : ''}
+        <span class="cms-tilesize" title="Kachelgröße">
+          <button type="button" data-size="s" class="${size === 's' ? 'on' : ''}" aria-label="Kleine Kacheln">▪</button>
+          <button type="button" data-size="m" class="${size === 'm' ? 'on' : ''}" aria-label="Mittlere Kacheln">◼</button>
+          <button type="button" data-size="l" class="${size === 'l' ? 'on' : ''}" aria-label="Große Kacheln">⬛</button>
+        </span>
+        ${a.kind === 'bibliothek' ? '<button class="cms-mbtn" data-act="addlink">🔗 Link / Video</button>' : ''}
+        <label class="cms-mbtn primary" for="cms-media-upload">＋ Bilder${a.kind === 'bibliothek' ? ' / PDF' : ''} hochladen</label>
+        <input id="cms-media-upload" type="file" multiple accept="${a.kind === 'bibliothek' ? 'image/*,.pdf,application/pdf' : 'image/*'}" style="display:none">
+      </div>
+      <div class="cms-media-row cms-media-selrow ${sel ? 'has-sel' : ''}">
+        <button class="cms-mbtn" data-act="selall">${sel && sel === a.items.length ? '☐ Auswahl aufheben' : '☑ Alle auswählen'}</button>
+        <span class="cms-selcount">${sel ? `<b>${sel}</b> ausgewählt` : 'Klick = auswählen · Shift+Klick = Bereich · Doppelklick = groß ansehen · Ziehen = sortieren'}</span>
+        <span class="spacer"></span>
+        <button class="cms-mbtn" data-act="hide" ${sel ? '' : 'disabled'}>👁 Aus-/Einblenden</button>
+        <label class="cms-mbtn ${sel && andere.length ? '' : 'is-disabled'}">➜ Verschieben nach
+          <select data-act="move" ${sel && andere.length ? '' : 'disabled'}>
+            <option value="">…</option>
+            ${andere.map(x => `<option value="${esc(x.id)}">${esc(x.title)} (${esc((MEDIA_KINDS.find(k => k.key === x.kind) || {}).label || x.kind)})</option>`).join('')}
+          </select>
+        </label>
+        <button class="cms-mbtn danger" data-act="del" ${sel ? '' : 'disabled'}>🗑 Löschen</button>
+      </div>
     `;
-    tools.querySelector('.cms-media-title').title = kind.hint;
 
+    tools.querySelectorAll('[data-size]').forEach(b => b.onclick = () => {
+      localStorage.setItem(TILE_KEY, b.dataset.size);
+      applyTileSize();
+      tools.querySelectorAll('[data-size]').forEach(x => x.classList.toggle('on', x === b));
+    });
     tools.querySelector('[data-act="rename"]').onclick = async () => {
       const title = prompt('Ordnername:', a.title);
       if (title === null) return;
       const text = prompt('Kurzbeschreibung (optional, erscheint unter der Überschrift):', a.text || '');
       if (text === null) return;
       await saveAlbum({ ...a, title: title.trim() || a.title, text: text.trim() }, '✓ Ordner aktualisiert');
-      renderMediaAside(); renderMediaMain();
+      renderMediaAside(); renderMediaTools();
     };
     tools.querySelector('[data-act="delfolder"]').onclick = async () => {
       if (!confirm(`Ordner „${a.title}" mit ${a.items.length} Einträgen endgültig löschen?`)) return;
@@ -1225,21 +1252,16 @@
       await saveAlbum(a, '✓ Link hinzugefügt');
       renderMediaAside(); renderMediaMain();
     };
+    const thumbsBtn = tools.querySelector('[data-act="thumbs"]');
+    if (thumbsBtn) thumbsBtn.onclick = () => generateMissingThumbs(a);
     tools.querySelector('[data-act="selall"]').onclick = () => {
       if (mediaSelected.size === a.items.length) mediaSelected.clear();
       else a.items.forEach(i => mediaSelected.add(i.id));
-      renderMediaMain();
+      updateSelectionUI();
     };
-    tools.querySelector('[data-act="hide"]').onclick = async () => {
-      const ziel = a.items.filter(i => mediaSelected.has(i.id));
-      const alleVersteckt = ziel.every(i => i.hidden);
-      ziel.forEach(i => { i.hidden = !alleVersteckt; });
-      await saveAlbum(a, alleVersteckt ? '✓ Wieder eingeblendet' : '✓ Ausgeblendet (bleibt gespeichert)');
-      renderMediaAside(); renderMediaMain();
-    };
+    tools.querySelector('[data-act="hide"]').onclick = toggleHiddenSelected;
     tools.querySelector('[data-act="move"]').onchange = async function () {
-      const zielId = this.value;
-      const ziel = mediaAlbums.find(x => x.id === zielId);
+      const ziel = mediaAlbums.find(x => x.id === this.value);
       if (!ziel) return;
       const bewegt = a.items.filter(i => mediaSelected.has(i.id));
       a.items = a.items.filter(i => !mediaSelected.has(i.id));
@@ -1250,31 +1272,53 @@
       mediaSelected.clear();
       renderMediaAside(); renderMediaMain();
     };
-    tools.querySelector('[data-act="del"]').onclick = async () => {
-      const n = mediaSelected.size;
-      if (!confirm(`${n} Einträge endgültig löschen? (Tipp: „Ausblenden" behält die Dateien.)`)) return;
-      const weg = a.items.filter(i => mediaSelected.has(i.id));
-      a.items = a.items.filter(i => !mediaSelected.has(i.id));
-      const ok = await saveAlbum(a, `✓ ${n} Einträge gelöscht`);
-      if (ok) {
-        const urls = weg.flatMap(i => [i.url, i.thumb]).filter(Boolean);
-        mediaPost({ op: 'deleteBlobs', urls }).catch(() => {});
-      } else {
-        await loadMedia();
-      }
-      mediaSelected.clear();
-      renderMediaAside(); renderMediaMain();
-    };
-
-    const thumbsBtn = tools.querySelector('[data-act="thumbs"]');
-    if (thumbsBtn) thumbsBtn.onclick = () => generateMissingThumbs(a);
-
-    renderMediaGrid();
+    tools.querySelector('[data-act="del"]').onclick = deleteSelected;
   }
 
-  // Bilder, die noch ohne kleine Vorschau gespeichert sind (z.B. aus der
-  // alten Galerie uebernommen). Ohne Vorschau laedt jeder Besucher das
-  // Original in voller Groesse – genau das hat das Datenvolumen gesprengt.
+  async function toggleHiddenSelected() {
+    const a = mediaCurrent;
+    const ziel = a.items.filter(i => mediaSelected.has(i.id));
+    if (!ziel.length) return;
+    const alleVersteckt = ziel.every(i => i.hidden);
+    ziel.forEach(i => { i.hidden = !alleVersteckt; });
+    await saveAlbum(a, alleVersteckt ? '✓ Wieder eingeblendet' : '✓ Ausgeblendet (bleibt gespeichert)');
+    renderMediaAside(); renderMediaMain();
+  }
+
+  async function deleteSelected() {
+    const a = mediaCurrent;
+    const n = mediaSelected.size;
+    if (!n) return;
+    if (!confirm(`${n} Einträge endgültig löschen? (Tipp: „Ausblenden" behält die Dateien.)`)) return;
+    const weg = a.items.filter(i => mediaSelected.has(i.id));
+    a.items = a.items.filter(i => !mediaSelected.has(i.id));
+    const ok = await saveAlbum(a, `✓ ${n} Einträge gelöscht`);
+    if (ok) {
+      const urls = weg.flatMap(i => [i.url, i.thumb]).filter(Boolean);
+      mediaPost({ op: 'deleteBlobs', urls }).catch(() => {});
+    } else {
+      await loadMedia();
+    }
+    mediaSelected.clear();
+    renderMediaAside(); renderMediaMain();
+  }
+
+  // Auswahl anzeigen, ohne das Raster neu aufzubauen
+  function updateSelectionUI() {
+    document.querySelectorAll('#cms-media-grid .cms-mitem').forEach(cell => {
+      const on = mediaSelected.has(cell.dataset.id);
+      cell.classList.toggle('selected', on);
+      const cb = cell.querySelector('input[type=checkbox]');
+      if (cb) cb.checked = on;
+    });
+    renderMediaTools();
+  }
+
+  function applyTileSize() {
+    const grid = document.getElementById('cms-media-grid');
+    if (grid) grid.dataset.size = tileSize();
+  }
+
   function needsThumb(it) {
     return it.type === 'image' && it.url && (!it.thumb || it.thumb === it.url) && /^https?:/.test(it.url) && !/\.svg(\?|$)/i.test(it.url);
   }
@@ -1292,14 +1336,8 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const blob = await res.blob();
         const thumbBlob = await makeThumb(new File([blob], 'bild.jpg', { type: blob.type || 'image/jpeg' }));
-        // Nur speichern, wenn die Vorschau wirklich kleiner ist
-        if (thumbBlob.size < blob.size) {
-          it.thumb = await uploadBlob(thumbBlob, 'jpg', (it.name || 'bild') + '-vorschau');
-        } else {
-          it.thumb = it.url;
-        }
+        it.thumb = thumbBlob.size < blob.size ? await uploadBlob(thumbBlob, 'jpg', (it.name || 'bild') + '-vorschau') : it.url;
         ok++;
-        // Zwischenspeichern alle 5 Bilder, damit bei Abbruch nichts verloren geht
         if (ok % 5 === 0) await saveAlbum(a);
       } catch (e) {
         console.warn('Vorschau fehlgeschlagen:', it.url, e.message);
@@ -1312,48 +1350,74 @@
     setMediaStatus(saved ? `✓ ${ok} Vorschaubilder erzeugt${fehler ? ` · ⚠ ${fehler} fehlgeschlagen` : ''}` : '⚠ Speichern fehlgeschlagen', saved && !fehler ? 'saved' : 'error');
   }
 
+  // Grossansicht eines Bildes innerhalb der Verwaltung
+  function previewItem(it) {
+    if (it.type !== 'image') { window.open(it.type === 'link' ? it.link : it.url, '_blank', 'noopener'); return; }
+    let pv = document.getElementById('cms-mpreview');
+    if (!pv) {
+      pv = document.createElement('div');
+      pv.id = 'cms-mpreview';
+      pv.innerHTML = '<img alt=""><span class="cms-mpreview-cap"></span><button type="button" aria-label="Schließen">✕</button>';
+      pv.addEventListener('click', () => pv.classList.remove('open'));
+      document.body.appendChild(pv);
+    }
+    pv.querySelector('img').src = it.url;
+    pv.querySelector('.cms-mpreview-cap').textContent = [it.title, it.name].filter(Boolean).join(' · ') || 'Original';
+    pv.classList.add('open');
+  }
+
   function renderMediaGrid() {
     const grid = document.getElementById('cms-media-grid');
     const a = mediaCurrent;
+    if (!a) return;
+    applyTileSize();
     grid.innerHTML = '';
     if (!a.items.length) {
       grid.innerHTML = `<div class="cms-media-empty">Dieser Ordner ist noch leer.<br>Über „＋ hochladen" kannst du mehrere Dateien auf einmal auswählen.</div>`;
       return;
     }
+    const frag = document.createDocumentFragment();
     a.items.forEach((it, idx) => {
       const cell = document.createElement('div');
       cell.className = 'cms-mitem' + (mediaSelected.has(it.id) ? ' selected' : '') + (it.hidden ? ' hidden' : '');
       cell.draggable = true;
       cell.dataset.idx = idx;
+      cell.dataset.id = it.id;
       const meta = [it.source, it.date].filter(Boolean).join(' · ');
       const inhalt = it.type === 'image'
         ? `<img src="${esc(it.thumb || it.url)}" alt="" loading="lazy" decoding="async">`
         : `<div class="cms-mdoc"><b>${it.type === 'pdf' ? 'PDF' : 'LINK'}</b><span>${esc(it.title || it.name || it.link)}</span>${meta ? `<span style="color:#ffffff88">${esc(meta)}</span>` : ''}</div>`;
       cell.innerHTML = `
-        <input type="checkbox" ${mediaSelected.has(it.id) ? 'checked' : ''} title="Auswählen">
-        ${it.hidden ? '<span class="cms-mbadge">versteckt</span>' : (it.type === 'image' && it.title ? `<span class="cms-mbadge" style="max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.title)}</span>` : '')}
         ${inhalt}
+        <input type="checkbox" ${mediaSelected.has(it.id) ? 'checked' : ''} title="Auswählen" tabindex="-1">
+        <span class="cms-mnum">${idx + 1}</span>
+        ${it.hidden ? '<span class="cms-mbadge">versteckt</span>' : (it.type === 'image' && it.title ? `<span class="cms-mbadge cms-mbadge--title">${esc(it.title)}</span>` : '')}
         <div class="cms-mactions">
           <button type="button" data-act="edit" title="Titel, Quelle, Datum">✎</button>
           <button type="button" data-act="hide" title="${it.hidden ? 'Einblenden' : 'Ausblenden'}">${it.hidden ? '👁' : '🙈'}</button>
           <button type="button" data-act="left" title="Nach vorne">◀</button>
           <button type="button" data-act="right" title="Nach hinten">▶</button>
-          <button type="button" data-act="open" title="Original öffnen">↗</button>
+          <button type="button" data-act="open" title="Groß ansehen">⤢</button>
         </div>
       `;
-      // Bild-Fehler sichtbar machen statt leerer Kachel
       const img = cell.querySelector('img');
       if (img) img.onerror = () => { img.replaceWith(Object.assign(document.createElement('div'), { className: 'cms-mdoc', innerHTML: '<b>⚠</b><span>Bild nicht ladbar</span>' })); };
 
-      cell.querySelector('input').addEventListener('change', e => {
-        if (e.target.checked) mediaSelected.add(it.id); else mediaSelected.delete(it.id);
-        renderMediaMain();
-      });
+      const toggle = (rangeFrom) => {
+        if (rangeFrom >= 0 && rangeFrom !== idx) {
+          const [s, e] = rangeFrom < idx ? [rangeFrom, idx] : [idx, rangeFrom];
+          for (let i = s; i <= e; i++) mediaSelected.add(a.items[i].id);
+        } else if (mediaSelected.has(it.id)) mediaSelected.delete(it.id);
+        else mediaSelected.add(it.id);
+        lastClickedIdx = idx;
+        updateSelectionUI();
+      };
+      cell.querySelector('input').addEventListener('click', e => { e.stopPropagation(); toggle(e.shiftKey ? lastClickedIdx : -1); });
       cell.addEventListener('click', e => {
-        if (e.target.closest('button') || e.target.matches('input')) return;
-        if (mediaSelected.has(it.id)) mediaSelected.delete(it.id); else mediaSelected.add(it.id);
-        renderMediaMain();
+        if (e.target.closest('button')) return;
+        toggle(e.shiftKey ? lastClickedIdx : -1);
       });
+      cell.addEventListener('dblclick', e => { if (!e.target.closest('button')) previewItem(it); });
       cell.querySelector('[data-act="edit"]').onclick = async () => {
         const v = await mediaForm(it.type === 'link' ? 'Link bearbeiten' : 'Beschreibung bearbeiten', it, it.type === 'link');
         if (!v) return;
@@ -1368,21 +1432,35 @@
       };
       cell.querySelector('[data-act="left"]').onclick = () => moveItem(idx, idx - 1);
       cell.querySelector('[data-act="right"]').onclick = () => moveItem(idx, idx + 1);
-      cell.querySelector('[data-act="open"]').onclick = () => window.open(it.type === 'link' ? it.link : it.url, '_blank', 'noopener');
+      cell.querySelector('[data-act="open"]').onclick = () => previewItem(it);
 
-      // Drag & Drop zum Sortieren
-      cell.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', String(idx)); cell.style.opacity = '.5'; });
-      cell.addEventListener('dragend', () => { cell.style.opacity = ''; });
-      cell.addEventListener('dragover', e => { e.preventDefault(); cell.style.outline = '2px dashed #e6b554'; });
-      cell.addEventListener('dragleave', () => { cell.style.outline = ''; });
+      cell.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', String(idx)); cell.classList.add('dragging'); });
+      cell.addEventListener('dragend', () => cell.classList.remove('dragging'));
+      cell.addEventListener('dragover', e => { e.preventDefault(); cell.classList.add('dropzone'); });
+      cell.addEventListener('dragleave', () => cell.classList.remove('dropzone'));
       cell.addEventListener('drop', e => {
-        e.preventDefault(); cell.style.outline = '';
+        e.preventDefault(); cell.classList.remove('dropzone');
         const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
         if (!Number.isNaN(from) && from !== idx) moveItem(from, idx);
       });
-      grid.appendChild(cell);
+      frag.appendChild(cell);
     });
+    grid.appendChild(frag);
   }
+
+  // Tastenkuerzel in der Medienverwaltung
+  document.addEventListener('keydown', e => {
+    const m = document.getElementById('cms-media');
+    if (!m || !m.classList.contains('open')) return;
+    if (e.target.matches('input, textarea, select')) return;
+    if (document.getElementById('cms-mform')?.classList.contains('open')) return;
+    const pv = document.getElementById('cms-mpreview');
+    if (e.key === 'Escape' && pv?.classList.contains('open')) { pv.classList.remove('open'); e.stopImmediatePropagation(); return; }
+    if (e.key === 'Escape' && mediaSelected.size) { mediaSelected.clear(); updateSelectionUI(); e.stopImmediatePropagation(); return; }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a' && mediaCurrent) { e.preventDefault(); mediaCurrent.items.forEach(i => mediaSelected.add(i.id)); updateSelectionUI(); }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && mediaSelected.size) { e.preventDefault(); deleteSelected(); }
+    if (e.key.toLowerCase() === 'h' && mediaSelected.size) { e.preventDefault(); toggleHiddenSelected(); }
+  }, true);
 
   async function moveItem(from, to) {
     const a = mediaCurrent;
