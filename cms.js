@@ -1025,9 +1025,6 @@
     `;
     document.body.appendChild(el);
     document.getElementById('cms-media-close').addEventListener('click', closeMediaManager);
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && el.classList.contains('open') && !document.getElementById('cms-mform')?.classList.contains('open')) closeMediaManager();
-    });
 
     const form = document.createElement('div');
     form.id = 'cms-mform';
@@ -1452,11 +1449,17 @@
   document.addEventListener('keydown', e => {
     const m = document.getElementById('cms-media');
     if (!m || !m.classList.contains('open')) return;
-    if (e.target.matches('input, textarea, select')) return;
+    if (e.target instanceof Element && e.target.matches('input, textarea, select')) return;
     if (document.getElementById('cms-mform')?.classList.contains('open')) return;
     const pv = document.getElementById('cms-mpreview');
-    if (e.key === 'Escape' && pv?.classList.contains('open')) { pv.classList.remove('open'); e.stopImmediatePropagation(); return; }
-    if (e.key === 'Escape' && mediaSelected.size) { mediaSelected.clear(); updateSelectionUI(); e.stopImmediatePropagation(); return; }
+    // Escape schliesst stufenweise: Grossansicht -> Auswahl -> Verwaltung
+    if (e.key === 'Escape') {
+      e.stopImmediatePropagation();
+      if (pv?.classList.contains('open')) pv.classList.remove('open');
+      else if (mediaSelected.size) { mediaSelected.clear(); updateSelectionUI(); }
+      else closeMediaManager();
+      return;
+    }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a' && mediaCurrent) { e.preventDefault(); mediaCurrent.items.forEach(i => mediaSelected.add(i.id)); updateSelectionUI(); }
     if ((e.key === 'Delete' || e.key === 'Backspace') && mediaSelected.size) { e.preventDefault(); deleteSelected(); }
     if (e.key.toLowerCase() === 'h' && mediaSelected.size) { e.preventDefault(); toggleHiddenSelected(); }
