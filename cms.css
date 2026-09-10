@@ -469,7 +469,7 @@ body.cms-active .site-header { top: 52px !important; }
 #cms-media-btn:hover { background: #e6b55418; border-color: #e6b554; }
 
 #cms-media {
-  position: fixed; inset: 0; z-index: 100000; background: #071710f5;
+  position: fixed; inset: 0; z-index: 100000; background: #071710;
   display: none; grid-template-rows: 58px 1fr; color: #f5efe0; font-family: "DM Sans", sans-serif;
 }
 #cms-media.open { display: grid; }

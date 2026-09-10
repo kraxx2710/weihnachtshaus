@@ -551,12 +551,22 @@
     });
   }
 
-  async function uploadBlob(blob, ext) {
+  // Dateiname fuer den Speicher: lesbarer Originalname (fuer Downloads
+  // der Presse), Sonderzeichen entfernt; der Server haengt eine Zufalls-
+  // kennung an, damit gleiche Namen sich nie ueberschreiben.
+  function safeFilename(name, ext) {
+    const base = String(name || '').replace(/\.[^.]+$/, '')
+      .toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+    return `${base || 'weihnachtshaus'}-${Date.now().toString(36)}.${ext}`;
+  }
+
+  async function uploadBlob(blob, ext, name) {
     const base64 = await blobToBase64(blob);
     const { url } = await apiFetch('/api/upload', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiToken()}` },
-      body: JSON.stringify({ filename: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`, data: base64 }),
+      body: JSON.stringify({ filename: safeFilename(name, ext), data: base64 }),
     });
     return url;
   }
@@ -574,7 +584,7 @@
       blob = resized.blob;
       ext = resized.ext;
     }
-    return uploadBlob(blob, ext);
+    return uploadBlob(blob, ext, file.name);
   }
 
   // Kleine Vorschau (max. 600 px) fuer Raster-Ansichten: Besucher laden
@@ -597,14 +607,14 @@
     const url = await uploadImage(file);
     let thumb = url;
     if (file.type !== 'image/svg+xml') {
-      try { thumb = await uploadBlob(await makeThumb(file), 'jpg'); } catch { thumb = url; }
+      try { thumb = await uploadBlob(await makeThumb(file), 'jpg', file.name.replace(/\.[^.]+$/, '') + '-vorschau'); } catch { thumb = url; }
     }
     return { url, thumb, name: file.name };
   }
 
   async function uploadPdf(file) {
     if (file.size > MAX_UPLOAD_BYTES) throw new Error(`PDF zu gross (max. ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB)`);
-    return uploadBlob(file, 'pdf');
+    return uploadBlob(file, 'pdf', file.name);
   }
 
   // ── Toolbar-Status ────────────────────────────────────
