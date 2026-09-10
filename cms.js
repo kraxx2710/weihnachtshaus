@@ -356,7 +356,15 @@
       btn.className = 'gallery-item';
       btn.type = 'button';
       btn.dataset.full = url;
-      btn.innerHTML = `<img src="${url}" alt="Weiteres Foto vom Weihnachtshaus">`;
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.alt = 'Weiteres Foto vom Weihnachtshaus';
+      // Nicht ladbare Bilder (z.B. gesperrter Speicher) verschwinden
+      // still aus dem Raster statt als Fehlersymbol zu erscheinen.
+      // Die URL bleibt in der Datenbank erhalten.
+      img.onerror = () => btn.remove();
+      img.src = url;
+      btn.appendChild(img);
       container.appendChild(btn);
     });
   }
@@ -372,8 +380,19 @@
     const el = document.querySelector(`[data-cms="${fieldId}"]`);
     if (!el) return;
     if (el.tagName === 'IMG') {
-      el.src = value;
+      // Original-Bild aus dem Projekt als Rueckfallebene merken:
+      // laedt das gespeicherte Bild nicht (z.B. Speicher gesperrt),
+      // springt das Element automatisch auf das Original zurueck.
+      if (!el.dataset.fallback) el.dataset.fallback = el.getAttribute('src') || '';
       const btn = el.closest('[data-full]');
+      el.onerror = () => {
+        el.onerror = null;
+        if (el.dataset.fallback && el.src !== el.dataset.fallback) {
+          el.src = el.dataset.fallback;
+          if (btn) btn.dataset.full = el.dataset.fallback;
+        }
+      };
+      el.src = value;
       if (btn) btn.dataset.full = value;
     } else if (el.tagName === 'A') {
       el.href = value;
